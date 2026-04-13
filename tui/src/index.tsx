@@ -17,7 +17,13 @@ import {
     listProcesses,
 } from "./ipc";
 
-type Screen = "main" | "editor" | "split" | "add_app" | "add_domain" | "pick_app";
+type Screen =
+    | "main"
+    | "editor"
+    | "split"
+    | "add_app"
+    | "add_domain"
+    | "pick_app";
 
 function formatBytes(b: number): string {
     if (b === 0) return "0 B";
@@ -65,7 +71,9 @@ function App() {
             ]);
             setStatus(s);
             const tunnelConfigs = await Promise.all(
-                (tunnelNames || []).map((name: string) => getTunnel(name).catch(() => null)),
+                (tunnelNames || []).map((name: string) =>
+                    getTunnel(name).catch(() => null),
+                ),
             );
             setTunnels(tunnelConfigs.filter(Boolean));
             setSettings(st);
@@ -89,54 +97,102 @@ function App() {
     const connectedName = status?.name || "";
     const stats = status?.stats || null;
 
-        useKeyboard((key) => {
-            if (key.name === "?") {
-                setShowHelp(h => !h);
-                return;
+    useKeyboard((key) => {
+        if (key.name === "?") {
+            setShowHelp((h) => !h);
+            return;
+        }
+        if (showHelp) {
+            if (key.name !== "up" && key.name !== "down") {
+                setShowHelp(false);
             }
-            if (showHelp) {
-                if (key.name !== "up" && key.name !== "down") {
-                    setShowHelp(false);
-                }
-                return;
-            }
+            return;
+        }
 
-            if (screen === "pick_app") {
-                if (pickAppRef.filtering) {
-                    if (key.name === "escape") {
-                        setPickAppRef(r => ({ ...r, filtering: false, filter: "" }));
-                    } else if (key.name === "return" && pickAppRef.filtered.length > 0) {
-                        pickAppRef.onSelect(pickAppRef.filtered[pickAppRef.selectedIdx].exe);
-                    } else if (key.name === "backspace") {
-                        const newFilter = pickAppRef.filter.slice(0, -1);
-                        const filtered = newFilter
-                            ? pickAppRef.procs.filter((p: any) => p.name.toLowerCase().includes(newFilter.toLowerCase()) || p.exe.toLowerCase().includes(newFilter.toLowerCase()))
-                            : pickAppRef.procs;
-                        setPickAppRef(r => ({ ...r, filter: newFilter, filtered, selectedIdx: Math.min(r.selectedIdx, filtered.length - 1) }));
-                    } else if (key.name && key.name.length === 1 && /[a-z0-9]/.test(key.name)) {
-                        const newFilter = pickAppRef.filter + key.name.toLowerCase();
-                        const filtered = pickAppRef.procs.filter((p: any) => p.name.toLowerCase().includes(newFilter) || p.exe.toLowerCase().includes(newFilter));
-                        setPickAppRef(r => ({ ...r, filter: newFilter, filtered, selectedIdx: Math.min(r.selectedIdx, filtered.length - 1) }));
-                    }
-                    return;
+        if (screen === "pick_app") {
+            if (pickAppRef.filtering) {
+                if (key.name === "escape") {
+                    setPickAppRef((r) => ({
+                        ...r,
+                        filtering: false,
+                        filter: "",
+                    }));
+                } else if (
+                    key.name === "return" &&
+                    pickAppRef.filtered.length > 0
+                ) {
+                    pickAppRef.onSelect(
+                        pickAppRef.filtered[pickAppRef.selectedIdx].exe,
+                    );
+                } else if (key.name === "backspace") {
+                    const newFilter = pickAppRef.filter.slice(0, -1);
+                    const filtered = newFilter
+                        ? pickAppRef.procs.filter(
+                              (p: any) =>
+                                  p.name
+                                      .toLowerCase()
+                                      .includes(newFilter.toLowerCase()) ||
+                                  p.exe
+                                      .toLowerCase()
+                                      .includes(newFilter.toLowerCase()),
+                          )
+                        : pickAppRef.procs;
+                    setPickAppRef((r) => ({
+                        ...r,
+                        filter: newFilter,
+                        filtered,
+                        selectedIdx: Math.min(
+                            r.selectedIdx,
+                            filtered.length - 1,
+                        ),
+                    }));
+                } else if (
+                    key.name &&
+                    key.name.length === 1 &&
+                    /[a-z0-9]/.test(key.name)
+                ) {
+                    const newFilter =
+                        pickAppRef.filter + key.name.toLowerCase();
+                    const filtered = pickAppRef.procs.filter(
+                        (p: any) =>
+                            p.name.toLowerCase().includes(newFilter) ||
+                            p.exe.toLowerCase().includes(newFilter),
+                    );
+                    setPickAppRef((r) => ({
+                        ...r,
+                        filter: newFilter,
+                        filtered,
+                        selectedIdx: Math.min(
+                            r.selectedIdx,
+                            filtered.length - 1,
+                        ),
+                    }));
                 }
+                return;
+            }
             if (key.name === "escape") setScreen("split");
             if (key.name === "up") {
-                setPickAppRef(r => {
+                setPickAppRef((r) => {
                     const newIdx = Math.max(0, r.selectedIdx - 1);
                     return { ...r, selectedIdx: newIdx };
                 });
             }
             if (key.name === "down") {
-                setPickAppRef(r => {
-                    const newIdx = Math.min(r.filtered.length - 1, r.selectedIdx + 1);
+                setPickAppRef((r) => {
+                    const newIdx = Math.min(
+                        r.filtered.length - 1,
+                        r.selectedIdx + 1,
+                    );
                     return { ...r, selectedIdx: newIdx };
                 });
             }
             if (key.name === "return" && pickAppRef.filtered.length > 0) {
-                pickAppRef.onSelect(pickAppRef.filtered[pickAppRef.selectedIdx].exe);
+                pickAppRef.onSelect(
+                    pickAppRef.filtered[pickAppRef.selectedIdx].exe,
+                );
             }
-            if (key.name === "/") setPickAppRef(r => ({ ...r, filtering: true }));
+            if (key.name === "/")
+                setPickAppRef((r) => ({ ...r, filtering: true }));
             return;
         }
 
@@ -204,13 +260,16 @@ function App() {
     return (
         <box flexDirection="column" width="100%" height="100%">
             <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
-                <box flexDirection="row" width="100%" justifyContent="space-between">
-                    <text fg="#7aa2f7"><strong>wgsplit</strong></text>
-                    {connected && (
-                        <text fg="#9ece6a">● {connectedName}</text>
-                    )}
+                <box
+                    flexDirection="row"
+                    width="100%"
+                    justifyContent="space-between"
+                >
+                    <text fg="#7aa2f7">
+                        <strong>Wireguard Split Tunneling Manager</strong>
+                    </text>
                     <text fg={daemonOk ? "#9ece6a" : "#f7768e"}>
-                        {daemonOk ? "ok" : "offline"}
+                        {daemonOk ? "READY" : "FAIL"}
                     </text>
                 </box>
             </box>
@@ -261,7 +320,9 @@ function App() {
                     }}
                     onPickApp={async () => {
                         const p = await listProcesses();
-                        const procs = (p || []).sort((a: any, b: any) => a.name.localeCompare(b.name));
+                        const procs = (p || []).sort((a: any, b: any) =>
+                            a.name.localeCompare(b.name),
+                        );
                         setPickAppRef({
                             procs,
                             filtered: procs,
@@ -272,12 +333,19 @@ function App() {
                             onSelect: (exe: string) => {
                                 setSettings((prev: any) => {
                                     const s = { ...prev };
-                                    s.split_tunneling = { ...s.split_tunneling };
+                                    s.split_tunneling = {
+                                        ...s.split_tunneling,
+                                    };
                                     const apps = { ...s.split_tunneling.apps };
-                                    if (s.split_tunneling.mode === "inclusive") {
+                                    if (
+                                        s.split_tunneling.mode === "inclusive"
+                                    ) {
                                         apps.vpn = [...(apps.vpn || []), exe];
                                     } else {
-                                        apps.direct = [...(apps.direct || []), exe];
+                                        apps.direct = [
+                                            ...(apps.direct || []),
+                                            exe,
+                                        ];
                                     }
                                     s.split_tunneling.apps = apps;
                                     return s;
@@ -297,23 +365,28 @@ function App() {
                 />
             )}
 
-        <box border borderColor="#3b4261" paddingX={1} flexShrink={0}>
-            <box flexDirection="row" width="100%" justifyContent="space-between">
+        <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
+            <box
+                flexDirection="row"
+                width="100%"
+                justifyContent="space-between"
+            >
                 {screen === "main" && (
-                    <text fg="#565f89">[enter] split [c] connect [e] edit [a] add</text>
+                    <text fg="#c0caf5">[enter] split [c] connect [e] edit [a] add</text>
                 )}
                 {screen === "editor" && (
-                    <text fg="#565f89">[↑/↓/tab] next [enter] save [esc] cancel</text>
+                    <text fg="#c0caf5">[↑/↓/tab] next [enter] save [esc] cancel</text>
                 )}
                 {screen === "split" && (
-                    <text fg="#565f89">[esc] back</text>
+                    <text fg="#c0caf5">[esc] back</text>
                 )}
                 {screen === "pick_app" && (
-                    <text fg="#565f89">[/] filter [enter] select [esc] cancel</text>
+                    <text fg="#c0caf5">[/] filter [enter] select [esc] cancel</text>
                 )}
-                <text fg="#565f89">[?] help [q] quit</text>
+                <text fg="#c0caf5">[?] help [q] quit</text>
             </box>
         </box>
+            </box>
 
             {showHelp && (
                 <box
@@ -328,29 +401,40 @@ function App() {
                 >
                     <scrollbox focused height="100%">
                         <box flexDirection="column" padding={1}>
-                            <text fg="#7aa2f7"><strong>Keyboard Shortcuts</strong></text>
+                            <text fg="#7aa2f7">
+                                <strong>Keyboard Shortcuts</strong>
+                            </text>
                             <text> </text>
-                            <text fg="#9ece6a"><strong>Tunnel List</strong></text>
-                            <text fg="#c0caf5">  [enter]   open split tunneling</text>
-                            <text fg="#c0caf5">  [c]       connect / disconnect</text>
-                            <text fg="#c0caf5">  [e]       edit tunnel</text>
-                            <text fg="#c0caf5">  [a]       add new tunnel</text>
-                            <text fg="#c0caf5">  [d]       delete tunnel</text>
-                            <text fg="#c0caf5">  [↑/↓]     navigate</text>
+                            <text fg="#9ece6a">
+                                <strong>Tunnel List</strong>
+                            </text>
+                            <text fg="#c0caf5">
+                                {" "}
+                                [enter] open split tunneling
+                            </text>
+                            <text fg="#c0caf5"> [c] connect / disconnect</text>
+                            <text fg="#c0caf5"> [e] edit tunnel</text>
+                            <text fg="#c0caf5"> [a] add new tunnel</text>
+                            <text fg="#c0caf5"> [d] delete tunnel</text>
+                            <text fg="#c0caf5"> [↑/↓] navigate</text>
                             <text> </text>
-                            <text fg="#9ece6a"><strong>Split Tunneling</strong></text>
-                            <text fg="#c0caf5">  [1]       toggle enabled</text>
-                            <text fg="#c0caf5">  [2]       toggle mode</text>
-                            <text fg="#c0caf5">  [a]       add application</text>
-                            <text fg="#c0caf5">  [d]       add domain</text>
-                            <text fg="#c0caf5">  [s]       save / apply</text>
+                            <text fg="#9ece6a">
+                                <strong>Split Tunneling</strong>
+                            </text>
+                            <text fg="#c0caf5"> [1] toggle enabled</text>
+                            <text fg="#c0caf5"> [2] toggle mode</text>
+                            <text fg="#c0caf5"> [a] add application</text>
+                            <text fg="#c0caf5"> [d] add domain</text>
+                            <text fg="#c0caf5"> [s] save / apply</text>
                             <text> </text>
-                            <text fg="#9ece6a"><strong>Process Picker</strong></text>
-                            <text fg="#c0caf5">  [/]       filter</text>
-                            <text fg="#c0caf5">  [↑/↓]     navigate</text>
-                            <text fg="#c0caf5">  [enter]   select</text>
+                            <text fg="#9ece6a">
+                                <strong>Process Picker</strong>
+                            </text>
+                            <text fg="#c0caf5"> [/] filter</text>
+                            <text fg="#c0caf5"> [↑/↓] navigate</text>
+                            <text fg="#c0caf5"> [enter] select</text>
                             <text> </text>
-                            <text fg="#565f89">  [?] or any key to close</text>
+                            <text fg="#565f89"> [?] or any key to close</text>
                         </box>
                     </scrollbox>
                 </box>
@@ -398,23 +482,43 @@ function TunnelList({
                             marginBottom={1}
                         >
                             <box flexDirection="row" width="100%" gap={2}>
-                                <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>{isSelected ? ">" : " "}</text>
-                                <text fg={isActive ? "#9ece6a" : "#c0caf5"}><strong>{tunnel.name}</strong></text>
-                                {isActive && <text fg="#9ece6a">● connected</text>}
+                                <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>
+                                    {isSelected ? ">" : " "}
+                                </text>
+                                <text fg={isActive ? "#9ece6a" : "#c0caf5"}>
+                                    <strong>{tunnel.name}</strong>
+                                </text>
+                                {isActive && (
+                                    <text fg="#9ece6a">● connected</text>
+                                )}
                                 {isActive && stats && (
                                     <>
-                                        <text fg="#565f89">↓{formatBytes(stats.rx_bytes)}</text>
-                                        <text fg="#565f89">↑{formatBytes(stats.tx_bytes)}</text>
+                                        <text fg="#565f89">
+                                            ↓{formatBytes(stats.rx_bytes)}
+                                        </text>
+                                        <text fg="#565f89">
+                                            ↑{formatBytes(stats.tx_bytes)}
+                                        </text>
                                     </>
                                 )}
                                 <box flexGrow={1} justifyContent="flex-end">
-                                    {isActive && splitEnabled && <text fg="#7aa2f7">split:on</text>}
+                                    {isActive && splitEnabled && (
+                                        <text fg="#7aa2f7">split:on</text>
+                                    )}
                                 </box>
                             </box>
                             <box flexDirection="row" gap={2} paddingLeft={2}>
-                                {host ? <text fg="#565f89">endpoint: {host}</text> : null}
-                                {addrs ? <text fg="#565f89">addr: {addrs}</text> : null}
-                                {peer?.allowed_ips ? <text fg="#565f89">routes: {peer.allowed_ips.join(", ")}</text> : null}
+                                {host ? (
+                                    <text fg="#565f89">endpoint: {host}</text>
+                                ) : null}
+                                {addrs ? (
+                                    <text fg="#565f89">addr: {addrs}</text>
+                                ) : null}
+                                {peer?.allowed_ips ? (
+                                    <text fg="#565f89">
+                                        routes: {peer.allowed_ips.join(", ")}
+                                    </text>
+                                ) : null}
                             </box>
                         </box>
                     );
@@ -529,7 +633,10 @@ function TunnelEditor({
                             <input
                                 value={values[field]}
                                 onChange={(v: string) =>
-                                    setValues((prev) => ({ ...prev, [field]: v }))
+                                    setValues((prev) => ({
+                                        ...prev,
+                                        [field]: v,
+                                    }))
                                 }
                                 focused={i === focusIdx}
                                 width={50}
@@ -742,7 +849,11 @@ function SplitTunnelView({
     );
 }
 
-function ProcessPicker({ state, setState, viewportHeight }: {
+function ProcessPicker({
+    state,
+    setState,
+    viewportHeight,
+}: {
     state: {
         procs: any[];
         filtered: any[];
@@ -756,13 +867,18 @@ function ProcessPicker({ state, setState, viewportHeight }: {
     viewportHeight: number;
 }) {
     const maxStart = Math.max(0, state.filtered.length - viewportHeight);
-    const start = Math.max(0, Math.min(state.selectedIdx - Math.floor(viewportHeight / 2), maxStart));
+    const start = Math.max(
+        0,
+        Math.min(state.selectedIdx - Math.floor(viewportHeight / 2), maxStart),
+    );
     const visibleItems = state.filtered.slice(start, start + viewportHeight);
 
     return (
         <box flexDirection="column" paddingX={1}>
             <box height={1}>
-                <text fg="#7aa2f7"><strong>Running Processes</strong> [/] filter</text>
+                <text fg="#7aa2f7">
+                    <strong>Running Processes</strong> [/] filter
+                </text>
             </box>
             {state.filtering ? (
                 <box height={1} flexDirection="row" gap={1}>
@@ -774,21 +890,45 @@ function ProcessPicker({ state, setState, viewportHeight }: {
                     <text fg="#565f89">{state.filtered.length} processes</text>
                 </box>
             )}
-            <box flexDirection="column" height={viewportHeight} overflow="hidden">
+            <box
+                flexDirection="column"
+                height={viewportHeight}
+                overflow="hidden"
+            >
                 {visibleItems.map((p: any, i: number) => {
                     const idx = start + i;
                     const isSelected = idx === state.selectedIdx;
                     return (
-                        <box key={p.pid} flexDirection="row" gap={1} height={1} backgroundColor={isSelected ? "#2f3349" : undefined}>
-                            <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>{isSelected ? ">" : " "}</text>
+                        <box
+                            key={p.pid}
+                            flexDirection="row"
+                            gap={1}
+                            height={1}
+                            backgroundColor={isSelected ? "#2f3349" : undefined}
+                        >
+                            <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>
+                                {isSelected ? ">" : " "}
+                            </text>
                             <text fg="#c0caf5">{p.name}</text>
-                            <text fg="#565f89" flexGrow={1}>{p.exe}</text>
+                            <text fg="#565f89" flexGrow={1}>
+                                {p.exe}
+                            </text>
                         </box>
                     );
                 })}
-                {Array.from({ length: Math.max(0, viewportHeight - visibleItems.length) }, (_, i) => (
-                    <box key={"blank" + i} height={1}><text> </text></box>
-                ))}
+                {Array.from(
+                    {
+                        length: Math.max(
+                            0,
+                            viewportHeight - visibleItems.length,
+                        ),
+                    },
+                    (_, i) => (
+                        <box key={"blank" + i} height={1}>
+                            <text> </text>
+                        </box>
+                    ),
+                )}
             </box>
         </box>
     );
