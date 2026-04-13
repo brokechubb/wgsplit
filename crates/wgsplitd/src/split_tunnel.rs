@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::RwLock;
 use log::info;
 use wgsplit_common::error::Result;
 use wgsplit_common::types::SplitTunnelingSettings;
@@ -13,7 +13,6 @@ use crate::nftables_mgr::NftablesManager;
 
 struct DnsLoopHandle {
     cancel_flag: Arc<AtomicBool>,
-    cancel_notify: Arc<Notify>,
 }
 
 #[allow(dead_code)]
@@ -132,17 +131,14 @@ impl SplitTunnelManager {
             let handle = self.dns_loop_handle.lock().unwrap();
             if let Some(ref h) = *handle {
                 h.cancel_flag.store(true, Ordering::SeqCst);
-                h.cancel_notify.notify_one();
             }
         }
 
         let cancel_flag = Arc::new(AtomicBool::new(false));
-        let cancel_notify = Arc::new(Notify::new());
         {
             let mut handle = self.dns_loop_handle.lock().unwrap();
             *handle = Some(DnsLoopHandle {
                 cancel_flag: cancel_flag.clone(),
-                cancel_notify: cancel_notify.clone(),
             });
         }
 
@@ -213,21 +209,22 @@ impl SplitTunnelManager {
                     return;
                 }
 
-                let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs as u64));
-                interval_timer.tick().await;
+                let mut next_resolve = tokio::time::Instant::now()
+                    + tokio::time::Duration::from_secs(interval_secs as u64);
                 loop {
+                    let sleep_dur = next_resolve.saturating_duration_since(tokio::time::Instant::now());
+                    let check_dur = std::cmp::min(sleep_dur, tokio::time::Duration::from_secs(1));
+                    tokio::time::sleep(check_dur).await;
+
                     if cancelled() {
                         info!("[dns:{}] cancelled", loop_id);
                         break;
                     }
-                    tokio::select! {
-                        _ = cancel_notify.notified() => {
-                            info!("[dns:{}] cancelled via notify", loop_id);
-                            break;
-                        }
-                        _ = interval_timer.tick() => {
-                            resolve_and_update().await;
-                        }
+
+                    if tokio::time::Instant::now() >= next_resolve {
+                        resolve_and_update().await;
+                        next_resolve = tokio::time::Instant::now()
+                            + tokio::time::Duration::from_secs(interval_secs as u64);
                     }
                 }
             });
