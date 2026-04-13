@@ -443,24 +443,20 @@ function TunnelEditor({
     ];
     const isEdit = !!tunnel;
 
-    const [values, setValues] = useState<Record<string, string>>({});
+    const initialValues: Record<string, string> = {
+        name: tunnel?.name || "",
+        privateKey: tunnel?.interface?.private_key || "",
+        address: tunnel?.interface?.address?.join(", ") || "",
+        dns: tunnel?.interface?.dns?.join(", ") || "",
+        peerPublicKey: tunnel?.peers?.[0]?.public_key || "",
+        peerEndpoint: tunnel?.peers?.[0]?.endpoint || "",
+        peerAllowedIps:
+            tunnel?.peers?.[0]?.allowed_ips?.join(", ") || "0.0.0.0/0",
+        peerKeepalive:
+            tunnel?.peers?.[0]?.persistent_keepalive?.toString() || "25",
+    };
+    const [values, setValues] = useState<Record<string, string>>(initialValues);
     const [focusIdx, setFocusIdx] = useState(0);
-
-    useEffect(() => {
-        setValues({
-            name: tunnel?.name || "",
-            privateKey: tunnel?.interface?.private_key || "",
-            address: tunnel?.interface?.address?.join(", ") || "",
-            dns: tunnel?.interface?.dns?.join(", ") || "",
-            peerPublicKey: tunnel?.peers?.[0]?.public_key || "",
-            peerEndpoint: tunnel?.peers?.[0]?.endpoint || "",
-            peerAllowedIps:
-                tunnel?.peers?.[0]?.allowed_ips?.join(", ") || "0.0.0.0/0",
-            peerKeepalive:
-                tunnel?.peers?.[0]?.persistent_keepalive?.toString() || "25",
-        });
-        setFocusIdx(0);
-    }, [tunnel]);
 
     useKeyboard((key) => {
         if (key.name === "tab") {
