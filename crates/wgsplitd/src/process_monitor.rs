@@ -61,6 +61,7 @@ pub struct ProcessMonitor {
     pid_to_app: HashMap<u32, String>,
 }
 
+#[allow(dead_code)]
 impl ProcessMonitor {
     pub fn new(app_paths: Vec<String>) -> Self {
         Self {

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{Notify, RwLock};
@@ -8,7 +7,6 @@ use wgsplit_common::types::SplitTunnelingSettings;
 
 use crate::cgroup::CgroupManager;
 use crate::process_monitor::{ProcessMonitor, start_process_monitor_loop};
-use crate::dns_resolver::DnsResolveLoop;
 use crate::host_routes::HostRoutesManager;
 use crate::routing::RoutingManager;
 use crate::nftables_mgr::NftablesManager;
@@ -18,6 +16,7 @@ struct DnsLoopHandle {
     cancel_notify: Arc<Notify>,
 }
 
+#[allow(dead_code)]
 pub struct SplitTunnelManager {
     fwmark: u32,
     table: u32,
@@ -130,7 +129,7 @@ impl SplitTunnelManager {
 
     fn start_dns_loop(&self, settings: &SplitTunnelingSettings) -> Result<()> {
         {
-            let mut handle = self.dns_loop_handle.lock().unwrap();
+            let handle = self.dns_loop_handle.lock().unwrap();
             if let Some(ref h) = *handle {
                 h.cancel_flag.store(true, Ordering::SeqCst);
                 h.cancel_notify.notify_one();

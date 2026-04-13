@@ -11,6 +11,7 @@ pub struct CgroupManager {
     enabled: bool,
 }
 
+#[allow(dead_code)]
 impl CgroupManager {
     pub fn new() -> Result<Self> {
         let cgroup_path = format!("{CGROUP_ROOT}/{CGROUP_NAME}");

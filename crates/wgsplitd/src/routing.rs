@@ -2,11 +2,13 @@ use std::process::Command;
 use log::debug;
 use wgsplit_common::error::{Result, WgsplitError};
 
+#[allow(dead_code)]
 pub struct RoutingManager {
     fwmark: u32,
     table: u32,
 }
 
+#[allow(dead_code)]
 impl RoutingManager {
     pub fn new(fwmark: u32, table: u32) -> Self {
         Self { fwmark, table }

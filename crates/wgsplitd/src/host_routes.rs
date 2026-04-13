@@ -59,10 +59,12 @@ impl HostRoutesManager {
             }
         }
 
-        for ip in self.current_routes.keys() {
-            if !new_routes.contains_key(ip) {
-                let _ = self.routing.del_host_route(ip);
-                debug!("Removed stale host route: {ip}");
+        if self.vpn_iface.is_some() {
+            for ip in self.current_routes.keys() {
+                if !new_routes.contains_key(ip) {
+                    let _ = self.routing.del_host_route(ip);
+                    debug!("Removed stale host route: {ip}");
+                }
             }
         }
 
@@ -79,6 +81,7 @@ impl HostRoutesManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn route_count(&self) -> usize {
         self.current_routes.len()
     }

@@ -1,15 +1,12 @@
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::Arc;
-use std::sync::atomic::AtomicU64;
 use log::{info, debug, error, warn};
 use serde_json::json;
 use wgsplit_common::proto::{Request, Response, IpcMessage, IpcPayload};
 use wgsplit_common::types::TunnelStatus;
 
 use crate::AppState;
-
-static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
 pub struct IpcServer {
     state: Arc<AppState>,

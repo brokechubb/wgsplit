@@ -2,10 +2,12 @@ use std::process::Command;
 use log::{info, debug};
 use wgsplit_common::error::{Result, WgsplitError};
 
+#[allow(dead_code)]
 pub struct NftablesManager {
     fwmark: u32,
 }
 
+#[allow(dead_code)]
 impl NftablesManager {
     pub fn new(fwmark: u32) -> Self {
         Self { fwmark }
