@@ -238,8 +238,9 @@ function App() {
                         try {
                             if (editingTunnel) await updateTunnel(editingTunnel.name, config);
                             else await addTunnel(config);
+                            await refresh();
+                            setSelectedIdx(0);
                             setScreen("main");
-                            refresh();
                         } catch (e: any) {
                             setError(e.message);
                         }
