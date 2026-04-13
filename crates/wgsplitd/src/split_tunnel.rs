@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::RwLock;
+use tokio::sync::{Notify, RwLock};
 use log::info;
 use wgsplit_common::error::Result;
 use wgsplit_common::types::SplitTunnelingSettings;
@@ -21,7 +20,7 @@ pub struct SplitTunnelManager {
     host_routes: Arc<RwLock<HostRoutesManager>>,
     nftables: Arc<std::sync::Mutex<NftablesManager>>,
     settings: Arc<RwLock<SplitTunnelingSettings>>,
-    dns_loop_cancel: Arc<std::sync::Mutex<Option<Arc<AtomicBool>>>>,
+    dns_loop_cancel: Arc<std::sync::Mutex<Option<Arc<Notify>>>>,
 }
 
 impl SplitTunnelManager {
@@ -126,21 +125,25 @@ impl SplitTunnelManager {
     fn start_dns_loop(&self, settings: &SplitTunnelingSettings) -> Result<()> {
         {
             let mut cancel = self.dns_loop_cancel.lock().unwrap();
-            if let Some(ref token) = *cancel {
-                token.store(true, Ordering::SeqCst);
+            if let Some(ref notify) = *cancel {
+                notify.notify_one();
             }
         }
 
-        let cancel_token = Arc::new(AtomicBool::new(false));
+        let cancel_notify = Arc::new(Notify::new());
         {
             let mut cancel = self.dns_loop_cancel.lock().unwrap();
-            *cancel = Some(cancel_token.clone());
+            *cancel = Some(cancel_notify.clone());
         }
 
         let vpn_domains = settings.domains.vpn.clone();
         let direct_domains = settings.domains.direct.clone();
         let interval_secs = settings.domains.resolve_interval_secs;
         let host_routes = self.host_routes.clone();
+        let loop_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() % 10000;
 
         std::thread::spawn(move || {
             let rt = tokio::runtime::Builder::new_current_thread()
@@ -151,20 +154,13 @@ impl SplitTunnelManager {
                 let resolver = crate::dns_resolver::DnsResolver::new()
                     .expect("Failed to create DNS resolver");
 
-                let mut resolve_and_update = || async {
-                    if cancel_token.load(Ordering::SeqCst) {
-                        return;
-                    }
-
+                let resolve_and_update = || async {
                     let mut all_resolved = std::collections::HashMap::new();
                     let mut all_ok = true;
                     let expected_count = vpn_domains.len() + direct_domains.len();
 
                     let vpn_results = resolver.resolve_all(&vpn_domains).await;
                     for host in &vpn_results {
-                        if cancel_token.load(Ordering::SeqCst) {
-                            return;
-                        }
                         if host.ips.is_empty() {
                             all_ok = false;
                         } else {
@@ -174,9 +170,6 @@ impl SplitTunnelManager {
 
                     let direct_results = resolver.resolve_all(&direct_domains).await;
                     for host in &direct_results {
-                        if cancel_token.load(Ordering::SeqCst) {
-                            return;
-                        }
                         if host.ips.is_empty() {
                             all_ok = false;
                         } else {
@@ -185,28 +178,30 @@ impl SplitTunnelManager {
                     }
 
                     if !all_ok && expected_count > 0 {
-                        log::warn!("DNS resolution incomplete ({}/{} domains), keeping existing routes", all_resolved.len(), expected_count);
+                        log::warn!("[dns:{}] resolution incomplete ({}/{}), keeping existing routes", loop_id, all_resolved.len(), expected_count);
                         return;
                     }
 
                     if !all_resolved.is_empty() {
                         let mut hr = host_routes.write().await;
                         if let Err(e) = hr.update_routes(&all_resolved) {
-                            log::error!("Failed to update host routes: {e}");
+                            log::error!("[dns:{}] failed to update host routes: {e}", loop_id);
                         }
                     }
                 };
 
+                info!("[dns:{}] starting, interval={}s", loop_id, interval_secs);
                 resolve_and_update().await;
 
                 let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs as u64));
+                interval_timer.tick().await;
                 loop {
                     tokio::select! {
+                        _ = cancel_notify.notified() => {
+                            info!("[dns:{}] cancelled", loop_id);
+                            break;
+                        }
                         _ = interval_timer.tick() => {
-                            if cancel_token.load(Ordering::SeqCst) {
-                                info!("DNS loop cancelled");
-                                break;
-                            }
                             resolve_and_update().await;
                         }
                     }
