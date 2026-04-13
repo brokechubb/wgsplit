@@ -200,23 +200,20 @@ function App() {
     return (
         <box flexDirection="column" width="100%" height="100%">
             <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
-                <box flexDirection="row" gap={2} flexGrow={1}>
-                    <text fg="#7aa2f7"><strong>wgsplit</strong></text>
-                    <text fg={daemonOk ? "#9ece6a" : "#f7768e"}>
-                        {daemonOk ? "ok" : "offline"}
-                    </text>
-                    {connected && (
-                        <text fg="#9ece6a">connected:{connectedName}</text>
-                    )}
-                    {settings?.split_tunneling?.enabled && (
-                        <text fg="#9ece6a">split:on</text>
-                    )}
-                    {stats && (
-                        <>
-                            <text fg="#565f89">↓{formatBytes(stats.rx_bytes)}</text>
-                            <text fg="#565f89">↑{formatBytes(stats.tx_bytes)}</text>
-                        </>
-                    )}
+                <box flexDirection="row" width="100%">
+                    <box>
+                        <text fg="#7aa2f7"><strong>wgsplit</strong></text>
+                    </box>
+                    <box flexGrow={1} justifyContent="center">
+                        {connected && (
+                            <text fg="#9ece6a">● {connectedName}</text>
+                        )}
+                    </box>
+                    <box>
+                        <text fg={daemonOk ? "#9ece6a" : "#f7768e"}>
+                            {daemonOk ? "ok" : "offline"}
+                        </text>
+                    </box>
                 </box>
             </box>
 
@@ -233,6 +230,7 @@ function App() {
                     connectedName={connectedName}
                     connected={connected}
                     stats={stats}
+                    splitEnabled={settings?.split_tunneling?.enabled || false}
                 />
             )}
             {screen === "editor" && (
@@ -365,12 +363,14 @@ function TunnelList({
     connectedName,
     connected,
     stats,
+    splitEnabled,
 }: {
     tunnels: any[];
     selectedIdx: number;
     connectedName: string;
     connected: boolean;
     stats: any;
+    splitEnabled: boolean;
 }) {
     return (
         <scrollbox focused flexGrow={1} minHeight={3}>
@@ -399,6 +399,7 @@ function TunnelList({
                                 <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>{isSelected ? ">" : " "}</text>
                                 <text fg={isActive ? "#9ece6a" : "#c0caf5"}><strong>{tunnel.name}</strong></text>
                                 {isActive && <text fg="#9ece6a">● connected</text>}
+                                {isActive && splitEnabled && <text fg="#7aa2f7">split:on</text>}
                                 {isActive && stats && (
                                     <>
                                         <text fg="#565f89">↓{formatBytes(stats.rx_bytes)}</text>
