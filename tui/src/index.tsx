@@ -1,5 +1,5 @@
 import { createCliRenderer } from "@opentui/core";
-import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
+import { createRoot, useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react";
 import { useState, useEffect, useCallback } from "react";
 import {
     listTunnels,
@@ -35,6 +35,7 @@ function formatBytes(b: number): string {
 
 function App() {
     const renderer = useRenderer();
+    const { height: termHeight } = useTerminalDimensions();
     const [screen, setScreen] = useState<Screen>("main");
     const [status, setStatus] = useState<any>(null);
     const [tunnels, setTunnels] = useState<any[]>([]);
@@ -357,7 +358,7 @@ function App() {
                 <ProcessPicker
                     state={pickAppRef}
                     setState={setPickAppRef}
-                    viewportHeight={Math.max(5, (renderer.height || 24) - 8)}
+                    viewportHeight={Math.max(5, (termHeight || 24) - 8)}
                 />
             )}
 
@@ -393,7 +394,7 @@ function App() {
                     top={3}
                     left={5}
                     width={60}
-                    height={Math.max(5, (renderer.height || 24) - 5)}
+                    height={Math.max(5, (termHeight || 24) - 5)}
                     border
                     borderColor="#7aa2f7"
                     backgroundColor="#1a1b26"
