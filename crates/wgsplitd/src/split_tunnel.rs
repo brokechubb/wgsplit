@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{Notify, RwLock};
 use log::info;
 use wgsplit_common::error::Result;
@@ -12,6 +13,11 @@ use crate::host_routes::HostRoutesManager;
 use crate::routing::RoutingManager;
 use crate::nftables_mgr::NftablesManager;
 
+struct DnsLoopHandle {
+    cancel_flag: Arc<AtomicBool>,
+    cancel_notify: Arc<Notify>,
+}
+
 pub struct SplitTunnelManager {
     fwmark: u32,
     table: u32,
@@ -20,7 +26,7 @@ pub struct SplitTunnelManager {
     host_routes: Arc<RwLock<HostRoutesManager>>,
     nftables: Arc<std::sync::Mutex<NftablesManager>>,
     settings: Arc<RwLock<SplitTunnelingSettings>>,
-    dns_loop_cancel: Arc<std::sync::Mutex<Option<Arc<Notify>>>>,
+    dns_loop_handle: Arc<std::sync::Mutex<Option<DnsLoopHandle>>>,
 }
 
 impl SplitTunnelManager {
@@ -39,7 +45,7 @@ impl SplitTunnelManager {
             host_routes: Arc::new(RwLock::new(host_routes)),
             nftables: Arc::new(std::sync::Mutex::new(nftables)),
             settings: Arc::new(RwLock::new(SplitTunnelingSettings::default())),
-            dns_loop_cancel: Arc::new(std::sync::Mutex::new(None)),
+            dns_loop_handle: Arc::new(std::sync::Mutex::new(None)),
         })
     }
 
@@ -124,16 +130,21 @@ impl SplitTunnelManager {
 
     fn start_dns_loop(&self, settings: &SplitTunnelingSettings) -> Result<()> {
         {
-            let mut cancel = self.dns_loop_cancel.lock().unwrap();
-            if let Some(ref notify) = *cancel {
-                notify.notify_one();
+            let mut handle = self.dns_loop_handle.lock().unwrap();
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
+                h.cancel_notify.notify_one();
             }
         }
 
+        let cancel_flag = Arc::new(AtomicBool::new(false));
         let cancel_notify = Arc::new(Notify::new());
         {
-            let mut cancel = self.dns_loop_cancel.lock().unwrap();
-            *cancel = Some(cancel_notify.clone());
+            let mut handle = self.dns_loop_handle.lock().unwrap();
+            *handle = Some(DnsLoopHandle {
+                cancel_flag: cancel_flag.clone(),
+                cancel_notify: cancel_notify.clone(),
+            });
         }
 
         let vpn_domains = settings.domains.vpn.clone();
@@ -154,12 +165,17 @@ impl SplitTunnelManager {
                 let resolver = crate::dns_resolver::DnsResolver::new()
                     .expect("Failed to create DNS resolver");
 
+                let cancelled = || cancel_flag.load(Ordering::SeqCst);
+
                 let resolve_and_update = || async {
+                    if cancelled() { return; }
+
                     let mut all_resolved = std::collections::HashMap::new();
                     let mut all_ok = true;
                     let expected_count = vpn_domains.len() + direct_domains.len();
 
                     let vpn_results = resolver.resolve_all(&vpn_domains).await;
+                    if cancelled() { return; }
                     for host in &vpn_results {
                         if host.ips.is_empty() {
                             all_ok = false;
@@ -169,6 +185,7 @@ impl SplitTunnelManager {
                     }
 
                     let direct_results = resolver.resolve_all(&direct_domains).await;
+                    if cancelled() { return; }
                     for host in &direct_results {
                         if host.ips.is_empty() {
                             all_ok = false;
@@ -192,13 +209,21 @@ impl SplitTunnelManager {
 
                 info!("[dns:{}] starting, interval={}s", loop_id, interval_secs);
                 resolve_and_update().await;
+                if cancelled() {
+                    info!("[dns:{}] cancelled after initial resolution", loop_id);
+                    return;
+                }
 
                 let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs as u64));
                 interval_timer.tick().await;
                 loop {
+                    if cancelled() {
+                        info!("[dns:{}] cancelled", loop_id);
+                        break;
+                    }
                     tokio::select! {
                         _ = cancel_notify.notified() => {
-                            info!("[dns:{}] cancelled", loop_id);
+                            info!("[dns:{}] cancelled via notify", loop_id);
                             break;
                         }
                         _ = interval_timer.tick() => {

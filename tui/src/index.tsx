@@ -1,5 +1,10 @@
 import { createCliRenderer } from "@opentui/core";
-import { createRoot, useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react";
+import {
+    createRoot,
+    useKeyboard,
+    useRenderer,
+    useTerminalDimensions,
+} from "@opentui/react";
 import { useState, useEffect, useCallback } from "react";
 import {
     listTunnels,
@@ -362,31 +367,33 @@ function App() {
                 />
             )}
 
-        <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
-            <box
-                flexDirection="row"
-                width="100%"
-                justifyContent="space-between"
-            >
-                {screen === "main" && (
+            <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
+                <box
+                    flexDirection="row"
+                    width="100%"
+                    justifyContent="space-between"
+                >
+                    {screen === "main" && (
+                        <text fg="#c0caf5">
+                            [c] connect [s] split [e] edit [a] add
+                        </text>
+                    )}
+                    {screen === "editor" && (
+                        <text fg="#c0caf5">
+                            [↑/↓/tab] next [enter] save [q] cancel
+                        </text>
+                    )}
+                    {screen === "split" && <text fg="#c0caf5">[q] back</text>}
+                    {screen === "pick_app" && (
+                        <text fg="#c0caf5">
+                            [/] filter [enter] select [q] cancel
+                        </text>
+                    )}
                     <text fg="#c0caf5">
-                        [enter] split [c] connect [e] edit [a] add
+                        [?] help {screen === "main" ? "[q] quit" : ""}
                     </text>
-                )}
-                {screen === "editor" && (
-                    <text fg="#c0caf5">
-                        [↑/↓/tab] next [enter] save [q] cancel
-                    </text>
-                )}
-                {screen === "split" && <text fg="#c0caf5">[q] back</text>}
-                {screen === "pick_app" && (
-                    <text fg="#c0caf5">
-                        [/] filter [enter] select [q] cancel
-                    </text>
-                )}
-                <text fg="#c0caf5">[?] help {screen === "main" ? "[q] quit" : ""}</text>
+                </box>
             </box>
-        </box>
 
             {showHelp && (
                 <box
