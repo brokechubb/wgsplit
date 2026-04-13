@@ -157,6 +157,12 @@ impl IpcServer {
                         if let Err(e) = state.split_tunnel.on_tunnel_connected(&iface) {
                             warn!("Split tunnel on-connect failed: {e}");
                         }
+                        let settings = state.config.settings.split_tunneling.clone();
+                        if settings.enabled {
+                            if let Err(e) = state.split_tunnel.apply_settings(&settings) {
+                                warn!("Failed to re-apply split tunneling on connect: {e}");
+                            }
+                        }
                         let mut active = state.active_tunnel.blocking_write();
                         *active = Some(name.clone());
                         Response::ok(json!({
