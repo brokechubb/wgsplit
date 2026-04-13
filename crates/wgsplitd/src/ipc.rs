@@ -113,12 +113,12 @@ impl IpcServer {
                 }
             }
 
-            Request::UpdateTunnel { original_name, config } => {
+            Request::UpdateTunnel { config } => {
                 let active = state.active_tunnel.blocking_read().clone();
-                if active.as_ref() == Some(&original_name) || active.as_ref() == Some(&config.name) {
+                if active.as_ref() == Some(&config.name) {
                     return Response::error("Cannot update a connected tunnel. Disconnect first.");
                 }
-                match state.tunnel_store.update(original_name, config) {
+                match state.tunnel_store.update(config) {
                     Ok(()) => Response::ok(json!("updated")),
                     Err(e) => Response::error(e.to_string()),
                 }

@@ -45,8 +45,8 @@ export async function getTunnel(name: string) {
 export async function addTunnel(config: any) {
   return sendRequest("add_tunnel", { config });
 }
-export async function updateTunnel(originalName: string, config: any) {
-    return sendRequest("update_tunnel", { original_name: originalName, config });
+export async function updateTunnel(config: any) {
+    return sendRequest("update_tunnel", { config });
 }
 export async function deleteTunnel(name: string) {
   return sendRequest("delete_tunnel", { name });

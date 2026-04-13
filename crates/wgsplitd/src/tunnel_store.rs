@@ -48,22 +48,11 @@ impl TunnelStore {
         self.write_conf(config)
     }
 
-    pub fn update(&self, original_name: &str, config: &TunnelConfig) -> Result<()> {
+    pub fn update(&self, config: &TunnelConfig) -> Result<()> {
         self.validate_name(&config.name)?;
-        if original_name != config.name {
-            let old_path = self.conf_path(original_name);
-            if !old_path.exists() {
-                return Err(WgsplitError::TunnelNotFound(original_name.to_string()));
-            }
-            if self.conf_path(&config.name).exists() {
-                return Err(WgsplitError::TunnelExists(config.name.clone()));
-            }
-            fs::remove_file(&old_path)?;
-        } else {
-            let path = self.conf_path(&config.name);
-            if !path.exists() {
-                return Err(WgsplitError::TunnelNotFound(config.name.clone()));
-            }
+        let path = self.conf_path(&config.name);
+        if !path.exists() {
+            return Err(WgsplitError::TunnelNotFound(config.name.clone()));
         }
         self.write_conf(config)
     }

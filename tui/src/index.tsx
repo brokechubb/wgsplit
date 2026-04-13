@@ -236,7 +236,7 @@ function App() {
                     tunnel={editingTunnel}
                     onSave={async (config) => {
                         try {
-                            if (editingTunnel) await updateTunnel(editingTunnel.name, config);
+                            if (editingTunnel) await updateTunnel(config);
                             else await addTunnel(config);
                             await refresh();
                             setSelectedIdx(0);
@@ -524,15 +524,19 @@ function TunnelEditor({
                             {i === focusIdx ? ">" : " "}
                             {labels[field]}:
                         </text>
-                        <input
-                            value={values[field]}
-                            onChange={(v: string) =>
-                                setValues((prev) => ({ ...prev, [field]: v }))
-                            }
-                            focused={i === focusIdx}
-                            width={50}
-                            backgroundColor="#1a1b26"
-                        />
+                        {isEdit && field === "name" ? (
+                            <text fg="#c0caf5">{values[field]}</text>
+                        ) : (
+                            <input
+                                value={values[field]}
+                                onChange={(v: string) =>
+                                    setValues((prev) => ({ ...prev, [field]: v }))
+                                }
+                                focused={i === focusIdx}
+                                width={50}
+                                backgroundColor="#1a1b26"
+                            />
+                        )}
                     </box>
                 ))}
                 <box flexDirection="row" gap={2}>
