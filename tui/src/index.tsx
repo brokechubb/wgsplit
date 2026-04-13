@@ -265,7 +265,7 @@ function App() {
                     width="100%"
                     justifyContent="space-between"
                 >
-                    <text fg="#7aa2f7">
+                    <text fg="#c0caf5">
                         <strong>Wireguard Split Tunneling Manager</strong>
                     </text>
                     <text fg={daemonOk ? "#9ece6a" : "#f7768e"}>
