@@ -365,27 +365,30 @@ function App() {
                 />
             )}
 
-        <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
-            <box
-                flexDirection="row"
-                width="100%"
-                justifyContent="space-between"
-            >
-                {screen === "main" && (
-                    <text fg="#c0caf5">[enter] split [c] connect [e] edit [a] add</text>
-                )}
-                {screen === "editor" && (
-                    <text fg="#c0caf5">[↑/↓/tab] next [enter] save [esc] cancel</text>
-                )}
-                {screen === "split" && (
-                    <text fg="#c0caf5">[esc] back</text>
-                )}
-                {screen === "pick_app" && (
-                    <text fg="#c0caf5">[/] filter [enter] select [esc] cancel</text>
-                )}
-                <text fg="#c0caf5">[?] help [q] quit</text>
-            </box>
-        </box>
+            <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
+                <box
+                    flexDirection="row"
+                    width="100%"
+                    justifyContent="space-between"
+                >
+                    {screen === "main" && (
+                        <text fg="#565f89">
+                            [enter] split [c] connect [e] edit [a] add
+                        </text>
+                    )}
+                    {screen === "editor" && (
+                        <text fg="#565f89">
+                            [↑/↓/tab] next [enter] save [esc] cancel
+                        </text>
+                    )}
+                    {screen === "split" && <text fg="#565f89">[esc] back</text>}
+                    {screen === "pick_app" && (
+                        <text fg="#565f89">
+                            [/] filter [enter] select [esc] cancel
+                        </text>
+                    )}
+                    <text fg="#565f89">[?] help [q] quit</text>
+                </box>
             </box>
 
             {showHelp && (
