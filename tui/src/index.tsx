@@ -396,7 +396,7 @@ function TunnelList({
                             paddingX={1}
                             marginBottom={1}
                         >
-                            <box flexDirection="row" width="100%">
+                            <box flexDirection="row" width="100%" gap={2}>
                                 <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>{isSelected ? ">" : " "}</text>
                                 <text fg={isActive ? "#9ece6a" : "#c0caf5"}><strong>{tunnel.name}</strong></text>
                                 {isActive && <text fg="#9ece6a">● connected</text>}
@@ -406,7 +406,7 @@ function TunnelList({
                                         <text fg="#565f89">↑{formatBytes(stats.tx_bytes)}</text>
                                     </>
                                 )}
-                                <box flexGrow={1}>
+                                <box flexGrow={1} justifyContent="flex-end">
                                     {isActive && splitEnabled && <text fg="#7aa2f7">split:on</text>}
                                 </box>
                             </box>
