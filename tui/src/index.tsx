@@ -303,7 +303,7 @@ function App() {
                     <text fg="#565f89">[enter] split [c] connect [e] edit [a] add</text>
                 )}
                 {screen === "editor" && (
-                    <text fg="#565f89">[tab] next [enter] save [esc] cancel</text>
+                    <text fg="#565f89">[↑/↓/tab] next [enter] save [esc] cancel</text>
                 )}
                 {screen === "split" && (
                     <text fg="#565f89">[esc] back</text>
@@ -459,8 +459,11 @@ function TunnelEditor({
     const [focusIdx, setFocusIdx] = useState(0);
 
     useKeyboard((key) => {
-        if (key.name === "tab") {
+        if (key.name === "tab" || key.name === "down") {
             setFocusIdx((i) => (i + 1) % fields.length);
+        }
+        if (key.name === "up") {
+            setFocusIdx((i) => (i - 1 + fields.length) % fields.length);
         }
         if (key.name === "return") {
             const config = {
