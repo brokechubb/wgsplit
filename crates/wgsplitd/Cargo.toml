@@ -1,0 +1,24 @@
+[package]
+name = "wgsplitd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "wgsplitd"
+path = "src/main.rs"
+
+[dependencies]
+wgsplit-common = { path = "../wgsplit-common" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+tokio = { workspace = true }
+hickory-resolver = "0.24"
+base64 = "0.22"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+rand = "0.8"

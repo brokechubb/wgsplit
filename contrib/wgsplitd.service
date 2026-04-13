@@ -1,0 +1,13 @@
+[Unit]
+Description=wgsplit WireGuard Split Tunneling Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/wgsplitd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

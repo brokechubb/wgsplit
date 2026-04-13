@@ -1,0 +1,19 @@
+[daemon]
+routing_table = 100
+fwmark = 0x800
+socket_path = "/run/wgsplitd.sock"
+tunnel_dir = ""   # auto-detected as ~/.config/wgsplit/tunnels
+
+[split_tunneling]
+enabled = false
+mode = "exclusive"    # "exclusive" = listed apps/domains bypass VPN
+                       # "inclusive" = only listed apps/domains use VPN
+
+[split_tunneling.apps]
+vpn = []
+direct = []
+
+[split_tunneling.domains]
+vpn = []
+direct = []
+resolve_interval_secs = 300
