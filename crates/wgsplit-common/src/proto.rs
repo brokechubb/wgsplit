@@ -16,7 +16,7 @@ pub enum Request {
     AddTunnel { config: TunnelConfig },
 
     #[serde(rename = "update_tunnel")]
-    UpdateTunnel { config: TunnelConfig },
+    UpdateTunnel { original_name: String, config: TunnelConfig },
 
     #[serde(rename = "delete_tunnel")]
     DeleteTunnel { name: String },

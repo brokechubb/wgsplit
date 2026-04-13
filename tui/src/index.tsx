@@ -236,7 +236,7 @@ function App() {
                     tunnel={editingTunnel}
                     onSave={async (config) => {
                         try {
-                            if (editingTunnel) await updateTunnel(config);
+                            if (editingTunnel) await updateTunnel(editingTunnel.name, config);
                             else await addTunnel(config);
                             setScreen("main");
                             refresh();
