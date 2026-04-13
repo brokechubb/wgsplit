@@ -394,7 +394,7 @@ function App() {
                     top={3}
                     left={5}
                     width={60}
-                    height={Math.max(5, (termHeight || 24) - 5)}
+                    height={Math.max(5, (termHeight || 24) - 7)}
                     border
                     borderColor="#7aa2f7"
                     backgroundColor="#1a1b26"
