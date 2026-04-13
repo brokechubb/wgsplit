@@ -148,6 +148,10 @@ function App() {
             renderer.destroy();
             return;
         }
+        if (key.name === "q") {
+            renderer.destroy();
+            return;
+        }
         if (key.ctrl && key.name === "c") {
             renderer.destroy();
             return;
@@ -200,20 +204,14 @@ function App() {
     return (
         <box flexDirection="column" width="100%" height="100%">
             <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
-                <box flexDirection="row" width="100%">
-                    <box>
-                        <text fg="#7aa2f7"><strong>wgsplit</strong></text>
-                    </box>
-                    <box flexGrow={1} justifyContent="center">
-                        {connected && (
-                            <text fg="#9ece6a">● {connectedName}</text>
-                        )}
-                    </box>
-                    <box>
-                        <text fg={daemonOk ? "#9ece6a" : "#f7768e"}>
-                            {daemonOk ? "ok" : "offline"}
-                        </text>
-                    </box>
+                <box flexDirection="row" width="100%" justifyContent="space-between">
+                    <text fg="#7aa2f7"><strong>wgsplit</strong></text>
+                    {connected && (
+                        <text fg="#9ece6a">● {connectedName}</text>
+                    )}
+                    <text fg={daemonOk ? "#9ece6a" : "#f7768e"}>
+                        {daemonOk ? "ok" : "offline"}
+                    </text>
                 </box>
             </box>
 
@@ -298,20 +296,23 @@ function App() {
                 />
             )}
 
-            <box border borderColor="#3b4261" paddingX={1} flexShrink={0}>
+        <box border borderColor="#3b4261" paddingX={1} flexShrink={0}>
+            <box flexDirection="row" width="100%" justifyContent="space-between">
                 {screen === "main" && (
-                    <text fg="#565f89">[enter] split  [c] connect  [e] edit  [a] add  [?] help</text>
+                    <text fg="#565f89">[enter] split [c] connect [e] edit [a] add</text>
                 )}
                 {screen === "editor" && (
-                    <text fg="#565f89">[tab] next  [enter] save  [esc] cancel</text>
+                    <text fg="#565f89">[tab] next [enter] save [esc] cancel</text>
                 )}
                 {screen === "split" && (
-                    <text fg="#565f89">[esc] back  [?] help</text>
+                    <text fg="#565f89">[esc] back</text>
                 )}
                 {screen === "pick_app" && (
-                    <text fg="#565f89">[/] filter  [enter] select  [esc] cancel</text>
+                    <text fg="#565f89">[/] filter [enter] select [esc] cancel</text>
                 )}
+                <text fg="#565f89">[?] help [q] quit</text>
             </box>
+        </box>
 
             {showHelp && (
                 <box
@@ -395,17 +396,19 @@ function TunnelList({
                             paddingX={1}
                             marginBottom={1}
                         >
-                            <box flexDirection="row" gap={2}>
+                            <box flexDirection="row" width="100%">
                                 <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>{isSelected ? ">" : " "}</text>
                                 <text fg={isActive ? "#9ece6a" : "#c0caf5"}><strong>{tunnel.name}</strong></text>
                                 {isActive && <text fg="#9ece6a">● connected</text>}
-                                {isActive && splitEnabled && <text fg="#7aa2f7">split:on</text>}
                                 {isActive && stats && (
                                     <>
                                         <text fg="#565f89">↓{formatBytes(stats.rx_bytes)}</text>
                                         <text fg="#565f89">↑{formatBytes(stats.tx_bytes)}</text>
                                     </>
                                 )}
+                                <box flexGrow={1}>
+                                    {isActive && splitEnabled && <text fg="#7aa2f7">split:on</text>}
+                                </box>
                             </box>
                             <box flexDirection="row" gap={2} paddingLeft={2}>
                                 {host ? <text fg="#565f89">endpoint: {host}</text> : null}
