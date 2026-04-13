@@ -135,29 +135,38 @@ impl SplitTunnelManager {
                 let resolver = crate::dns_resolver::DnsResolver::new()
                     .expect("Failed to create DNS resolver");
                 let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs as u64));
+                interval_timer.tick().await;
                 loop {
                     interval_timer.tick().await;
-                    
+
                     let mut all_resolved = std::collections::HashMap::new();
-                    let mut any_success = false;
-                    
+                    let mut all_ok = true;
+                    let expected_count = vpn_domains.len() + direct_domains.len();
+
                     let vpn_results = resolver.resolve_all(&vpn_domains).await;
-                    for host in vpn_results {
-                        if !host.ips.is_empty() {
-                            all_resolved.insert(format!("vpn:{}", host.domain), host.ips);
-                            any_success = true;
+                    for host in &vpn_results {
+                        if host.ips.is_empty() {
+                            all_ok = false;
+                        } else {
+                            all_resolved.insert(format!("vpn:{}", host.domain), host.ips.clone());
                         }
                     }
-                    
+
                     let direct_results = resolver.resolve_all(&direct_domains).await;
-                    for host in direct_results {
-                        if !host.ips.is_empty() {
-                            all_resolved.insert(format!("direct:{}", host.domain), host.ips);
-                            any_success = true;
+                    for host in &direct_results {
+                        if host.ips.is_empty() {
+                            all_ok = false;
+                        } else {
+                            all_resolved.insert(format!("direct:{}", host.domain), host.ips.clone());
                         }
                     }
-                    
-                    if any_success {
+
+                    if !all_ok && expected_count > 0 {
+                        log::warn!("DNS resolution incomplete ({}/{} domains), keeping existing routes", all_resolved.len(), expected_count);
+                        continue;
+                    }
+
+                    if !all_resolved.is_empty() {
                         let mut hr = host_routes.write().await;
                         if let Err(e) = hr.update_routes(&all_resolved) {
                             log::error!("Failed to update host routes: {e}");
