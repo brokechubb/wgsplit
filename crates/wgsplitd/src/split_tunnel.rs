@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::RwLock;
 use log::info;
 use wgsplit_common::error::Result;
@@ -20,6 +21,7 @@ pub struct SplitTunnelManager {
     host_routes: Arc<RwLock<HostRoutesManager>>,
     nftables: Arc<std::sync::Mutex<NftablesManager>>,
     settings: Arc<RwLock<SplitTunnelingSettings>>,
+    dns_loop_cancel: Arc<std::sync::Mutex<Option<Arc<AtomicBool>>>>,
 }
 
 impl SplitTunnelManager {
@@ -38,6 +40,7 @@ impl SplitTunnelManager {
             host_routes: Arc::new(RwLock::new(host_routes)),
             nftables: Arc::new(std::sync::Mutex::new(nftables)),
             settings: Arc::new(RwLock::new(SplitTunnelingSettings::default())),
+            dns_loop_cancel: Arc::new(std::sync::Mutex::new(None)),
         })
     }
 
@@ -121,6 +124,19 @@ impl SplitTunnelManager {
     }
 
     fn start_dns_loop(&self, settings: &SplitTunnelingSettings) -> Result<()> {
+        {
+            let mut cancel = self.dns_loop_cancel.lock().unwrap();
+            if let Some(ref token) = *cancel {
+                token.store(true, Ordering::SeqCst);
+            }
+        }
+
+        let cancel_token = Arc::new(AtomicBool::new(false));
+        {
+            let mut cancel = self.dns_loop_cancel.lock().unwrap();
+            *cancel = Some(cancel_token.clone());
+        }
+
         let vpn_domains = settings.domains.vpn.clone();
         let direct_domains = settings.domains.direct.clone();
         let interval_secs = settings.domains.resolve_interval_secs;
@@ -134,10 +150,11 @@ impl SplitTunnelManager {
             rt.block_on(async move {
                 let resolver = crate::dns_resolver::DnsResolver::new()
                     .expect("Failed to create DNS resolver");
-                let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs as u64));
-                interval_timer.tick().await;
-                loop {
-                    interval_timer.tick().await;
+
+                let mut resolve_and_update = || async {
+                    if cancel_token.load(Ordering::SeqCst) {
+                        return;
+                    }
 
                     let mut all_resolved = std::collections::HashMap::new();
                     let mut all_ok = true;
@@ -145,6 +162,9 @@ impl SplitTunnelManager {
 
                     let vpn_results = resolver.resolve_all(&vpn_domains).await;
                     for host in &vpn_results {
+                        if cancel_token.load(Ordering::SeqCst) {
+                            return;
+                        }
                         if host.ips.is_empty() {
                             all_ok = false;
                         } else {
@@ -154,6 +174,9 @@ impl SplitTunnelManager {
 
                     let direct_results = resolver.resolve_all(&direct_domains).await;
                     for host in &direct_results {
+                        if cancel_token.load(Ordering::SeqCst) {
+                            return;
+                        }
                         if host.ips.is_empty() {
                             all_ok = false;
                         } else {
@@ -163,13 +186,28 @@ impl SplitTunnelManager {
 
                     if !all_ok && expected_count > 0 {
                         log::warn!("DNS resolution incomplete ({}/{} domains), keeping existing routes", all_resolved.len(), expected_count);
-                        continue;
+                        return;
                     }
 
                     if !all_resolved.is_empty() {
                         let mut hr = host_routes.write().await;
                         if let Err(e) = hr.update_routes(&all_resolved) {
                             log::error!("Failed to update host routes: {e}");
+                        }
+                    }
+                };
+
+                resolve_and_update().await;
+
+                let mut interval_timer = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs as u64));
+                loop {
+                    tokio::select! {
+                        _ = interval_timer.tick() => {
+                            if cancel_token.load(Ordering::SeqCst) {
+                                info!("DNS loop cancelled");
+                                break;
+                            }
+                            resolve_and_update().await;
                         }
                     }
                 }
