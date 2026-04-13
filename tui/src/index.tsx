@@ -196,15 +196,11 @@ function App() {
             return;
         }
 
-        if (key.name === "escape") {
+        if (key.name === "escape" || key.name === "q") {
             if (screen !== "main") {
                 setScreen("main");
                 return;
             }
-            renderer.destroy();
-            return;
-        }
-        if (key.name === "q") {
             renderer.destroy();
             return;
         }
@@ -378,16 +374,16 @@ function App() {
                 )}
                 {screen === "editor" && (
                     <text fg="#c0caf5">
-                        [↑/↓/tab] next [enter] save [esc] cancel
+                        [↑/↓/tab] next [enter] save [q] cancel
                     </text>
                 )}
-                {screen === "split" && <text fg="#c0caf5">[esc] back</text>}
+                {screen === "split" && <text fg="#c0caf5">[q] back</text>}
                 {screen === "pick_app" && (
                     <text fg="#c0caf5">
-                        [/] filter [enter] select [esc] cancel
+                        [/] filter [enter] select [q] cancel
                     </text>
                 )}
-                <text fg="#c0caf5">[?] help [q] quit</text>
+                <text fg="#c0caf5">[?] help {screen === "main" ? "[q] quit" : ""}</text>
             </box>
         </box>
 
