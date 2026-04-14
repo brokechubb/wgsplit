@@ -950,5 +950,45 @@ function ProcessPicker({
     );
 }
 
+const args = process.argv.slice(2);
+if (args[0] === "import" && args[1]) {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const filePath = args[1];
+    try {
+        const contents = await fs.readFile(filePath, "utf-8");
+        let name = path.basename(filePath, path.extname(filePath))
+            .toUpperCase()
+            .replace(/[^A-Z0-9_-]/g, "") || "imported";
+        const msg = JSON.stringify({
+            id: 1,
+            type: "request",
+            request: {
+                method: "import_tunnel",
+                params: { name, config_text: contents },
+            },
+        });
+        const proc = Bun.spawn(["socat", "-", "UNIX-CONNECT:/run/wgsplitd.sock"], {
+            stdin: "pipe",
+            stdout: "pipe",
+            stderr: "pipe",
+        });
+        proc.stdin.write(msg + "\n");
+        proc.stdin.end();
+        const out = await new Response(proc.stdout).text();
+        const resp = JSON.parse(out.trim());
+        if (resp.response?.status === "ok") {
+            console.log(`imported tunnel '${name}'`);
+        } else {
+            console.error(`error: ${resp.response?.data || "unknown error"}`);
+            process.exit(1);
+        }
+    } catch (e: any) {
+        console.error(`error: ${e.message}`);
+        process.exit(1);
+    }
+    process.exit(0);
+}
+
 const renderer = await createCliRenderer({ exitOnCtrlC: false });
 createRoot(renderer).render(<App />);
