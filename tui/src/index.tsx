@@ -500,18 +500,18 @@ function TunnelList({
                             paddingX={1}
                             marginBottom={1}
                         >
-                            <box flexDirection="row" width="100%">
-                                <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>
-                                    {isSelected ? ">" : " "}
-                                </text>
-                                <text fg={isActive ? "#9ece6a" : "#c0caf5"}>
-                                    <strong>{tunnel.name}</strong>
-                                </text>
-                                <box flexGrow={1} justifyContent="flex-end">
-                                    {isActive && (
-                                        <text fg="#9ece6a">● CONNECTED</text>
-                                    )}
+                            <box flexDirection="row" width="100%" justifyContent="space-between">
+                                <box flexDirection="row">
+                                    <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>
+                                        {isSelected ? ">" : " "}
+                                    </text>
+                                    <text fg={isActive ? "#9ece6a" : "#c0caf5"}>
+                                        <strong>{tunnel.name}</strong>
+                                    </text>
                                 </box>
+                                {isActive && (
+                                    <text fg="#9ece6a">● CONNECTED</text>
+                                )}
                             </box>
                             <box flexDirection="row" gap={2} paddingLeft={2}>
                                 {host ? (

@@ -103,33 +103,29 @@ impl WireGuardManager {
         if !self.interface_exists(iface) {
             return Ok(None);
         }
-        let output = self.run_cmd_capture("wg", &["show", iface, "transfer", "latest-handshakes"])?;
-        let lines: Vec<&str> = output.lines().collect();
-        if lines.is_empty() {
-            return Ok(Some(TunnelStats {
-                rx_bytes: 0,
-                tx_bytes: 0,
-                latest_handshake: None,
-            }));
-        }
 
         let mut rx_bytes = 0u64;
         let mut tx_bytes = 0u64;
         let mut latest_handshake = None;
 
-        for line in &lines {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 3 {
-                rx_bytes += parts[1].parse().unwrap_or(0);
-                tx_bytes += parts[2].parse().unwrap_or(0);
+        if let Ok(output) = self.run_cmd_capture("wg", &["show", iface, "transfer"]) {
+            for line in output.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 3 {
+                    rx_bytes += parts[1].parse().unwrap_or(0);
+                    tx_bytes += parts[2].parse().unwrap_or(0);
+                }
             }
         }
-        for line in &lines {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() >= 3 {
-                if let Ok(ts) = parts[2].parse::<u64>() {
-                    if ts > 0 {
-                        latest_handshake = Some(ts);
+
+        if let Ok(output) = self.run_cmd_capture("wg", &["show", iface, "latest-handshakes"]) {
+            for line in output.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    if let Ok(ts) = parts[1].parse::<u64>() {
+                        if ts > 0 {
+                            latest_handshake = Some(ts);
+                        }
                     }
                 }
             }
