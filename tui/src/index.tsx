@@ -432,7 +432,7 @@ function App() {
                             <text fg="#c0caf5"> [1] toggle enabled</text>
                             <text fg="#c0caf5"> [2] toggle mode</text>
                             <text fg="#c0caf5"> [a] add application</text>
-                            <text fg="#c0caf5"> [d] add domain</text>
+                            <text fg="#c0caf5"> [d] add domain/IP</text>
                             <text fg="#c0caf5"> [s] save / apply</text>
                             <text> </text>
                             <text fg="#9ece6a">
@@ -786,9 +786,9 @@ function SplitTunnelView({
                 </box>
 
                 <text fg="#565f89">
-                    {mode === "exclusive"
-                        ? "Exclusive: listed apps/domains bypass VPN"
-                        : "Inclusive: only listed apps/domains use VPN"}
+                        {mode === "exclusive"
+                            ? "Exclusive: listed apps/domains/IPs bypass VPN"
+                            : "Inclusive: only listed apps/domains/IPs use VPN"}
                 </text>
 
                 <text> </text>
@@ -817,7 +817,7 @@ function SplitTunnelView({
                 <box border borderColor="#3b4261" paddingX={1}>
                     <box flexDirection="column">
                         <text fg="#7aa2f7">
-                            <strong>Domains</strong> [d] add
+                            <strong>Domains / IPs</strong> [d] add
                         </text>
                         {vpnDomains.map((d, i) => (
                             <text key={"vd" + i} fg="#7aa2f7">
@@ -829,9 +829,9 @@ function SplitTunnelView({
                                 direct: {d}
                             </text>
                         ))}
-                        {vpnDomains.length === 0 &&
+                            {vpnDomains.length === 0 &&
                             directDomains.length === 0 && (
-                                <text fg="#565f89">No domains configured</text>
+                                <text fg="#565f89">No domains or IPs configured</text>
                             )}
                     </box>
                 </box>
@@ -850,7 +850,7 @@ function SplitTunnelView({
                 )}
                 {inputMode === "domain" && (
                     <box flexDirection="row" gap={1}>
-                        <text fg="#7aa2f7">Domain:</text>
+                        <text fg="#7aa2f7">Domain/IP:</text>
                         <input
                             value={newDomain}
                             onChange={setNewDomain}
