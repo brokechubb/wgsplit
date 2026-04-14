@@ -380,13 +380,13 @@ function App() {
                     )}
                     {screen === "editor" && (
                         <text fg="#c0caf5">
-                            [↑/↓/tab] next [enter] save [esc/q] cancel
+                            [↑/↓/tab] next [enter] save [esc] cancel
                         </text>
                     )}
-                    {screen === "split" && <text fg="#c0caf5">[esc/q] back</text>}
+                    {screen === "split" && <text fg="#c0caf5">[esc] back</text>}
                     {screen === "pick_app" && (
                         <text fg="#c0caf5">
-                            [/] filter [enter] select [esc/q] cancel
+                            [/] filter [enter] select [esc] cancel
                         </text>
                     )}
                     <text fg="#c0caf5">
