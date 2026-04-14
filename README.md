@@ -1,8 +1,8 @@
 # wgsplit
 
-WireGuard Split Tunneling Manager for Linux.
+WireGuard Connection Manager with Split Tunneling for Linux.
 
-Per-application and per-domain/IP split tunneling with a terminal UI.
+Manage WireGuard tunnels with per-application and per-domain/IP routing via a terminal UI.
 
 ## Features
 
