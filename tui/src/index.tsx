@@ -442,6 +442,12 @@ function App() {
                             <text fg="#c0caf5"> [↑/↓] navigate</text>
                             <text fg="#c0caf5"> [enter] select</text>
                             <text> </text>
+                            <text fg="#9ece6a">
+                                <strong>CLI</strong>
+                            </text>
+                            <text fg="#c0caf5"> wgsplit                      launch TUI</text>
+                            <text fg="#c0caf5"> wgsplit tunnel.conf          import tunnel</text>
+                            <text> </text>
                             <text fg="#565f89"> [?] or any key to close</text>
                         </box>
                     </scrollbox>
