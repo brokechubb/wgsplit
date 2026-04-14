@@ -45,6 +45,9 @@ pub enum Request {
     #[serde(rename = "list_processes")]
     ListProcesses,
 
+    #[serde(rename = "import_tunnel")]
+    ImportTunnel { name: String, config_text: String },
+
     #[serde(rename = "ping")]
     Ping,
 }

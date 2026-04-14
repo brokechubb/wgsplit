@@ -256,6 +256,13 @@ impl IpcServer {
             let procs = crate::process_monitor::list_running_processes();
             Response::ok(procs)
         }
+
+        Request::ImportTunnel { name, config_text } => {
+            match state.tunnel_store.import_conf(name, config_text) {
+                Ok(config) => Response::ok(config),
+                Err(e) => Response::error(e.to_string()),
+            }
+        }
         }
     }
 }
