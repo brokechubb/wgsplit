@@ -127,24 +127,16 @@ impl SplitTunnelManager {
     }
 
     fn start_dns_loop(&self, settings: &SplitTunnelingSettings) -> Result<()> {
-        log::info!("[dns] start_dns_loop called, acquiring handle lock");
         {
             let handle = self.dns_loop_handle.lock().unwrap();
-            match *handle {
-                Some(ref h) => {
-                    log::info!("[dns] found previous loop, flag={}, setting cancel", h.cancel_flag.load(Ordering::SeqCst));
-                    h.cancel_flag.store(true, Ordering::SeqCst);
-                }
-                None => {
-                    log::info!("[dns] no previous loop found");
-                }
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
             }
         }
 
         let cancel_flag = Arc::new(AtomicBool::new(false));
         {
             let mut handle = self.dns_loop_handle.lock().unwrap();
-            log::info!("[dns] storing new handle");
             *handle = Some(DnsLoopHandle {
                 cancel_flag: cancel_flag.clone(),
             });
