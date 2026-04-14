@@ -23,6 +23,11 @@ impl DnsResolver {
     }
 
     pub async fn resolve(&self, domain: &str) -> Result<Vec<String>> {
+        if let Ok(addr) = domain.parse::<std::net::IpAddr>() {
+            debug!("{domain} is already an IP, skipping DNS");
+            return Ok(vec![addr.to_string()]);
+        }
+
         let lookup = self.resolver.lookup_ip(domain).await
             .map_err(|e| WgsplitError::Dns(format!("Failed to resolve {domain}: {e}")))?;
 
