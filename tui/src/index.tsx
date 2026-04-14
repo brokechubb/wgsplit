@@ -951,6 +951,23 @@ function ProcessPicker({
 }
 
 const args = process.argv.slice(2);
+if (args.includes("--help") || args.includes("-h")) {
+    console.log(`wgsplit - WireGuard Split Tunneling Manager
+
+Usage:
+  wgsplit                  Launch TUI
+  wgsplit import <file>    Import tunnel from WireGuard .conf file
+  wgsplit --help           Show this help
+
+Service:
+  sudo systemctl start wgsplitd   Start daemon
+  sudo systemctl enable wgsplitd  Start on boot
+
+Files:
+  ~/.config/wgsplit/settings.toml   Daemon settings
+  ~/.config/wgsplit/tunnels/        Tunnel configs`);
+    process.exit(0);
+}
 if (args[0] === "import" && args[1]) {
     const fs = await import("fs/promises");
     const path = await import("path");
