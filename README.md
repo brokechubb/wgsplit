@@ -2,12 +2,12 @@
 
 WireGuard Split Tunneling Manager for Linux.
 
-Per-application and per-domain split tunneling with a terminal UI.
+Per-application and per-domain/IP split tunneling with a terminal UI.
 
 ## Features
 
 - **Per-application routing**: Route specific apps through VPN or direct
-- **Per-domain routing**: Route specific domains through VPN or direct  
+- **Per-domain/IP routing**: Route specific domains or IP addresses through VPN or direct  
 - **WireGuard management**: Add, edit, delete, connect/disconnect tunnels
 - **Terminal UI**: Fast, responsive TUI built with OpenTUI
 - **Systemd integration**: Run as a system service
@@ -94,9 +94,9 @@ wgsplit --help
 
 Add application executables to route through VPN (inclusive mode) or bypass VPN (exclusive mode). Uses cgroups v2 and nftables packet marking.
 
-### Per-Domain  
+### Per-Domain/IP
 
-Add domains to resolve and route through VPN or direct. DNS resolution updates automatically when IPs change.
+Add domains or IP addresses to route through VPN or direct. Domains are resolved via DNS and routes update automatically when IPs change. Raw IP addresses are routed directly without DNS resolution.
 
 ## Configuration
 
