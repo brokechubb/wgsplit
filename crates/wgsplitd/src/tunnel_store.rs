@@ -67,17 +67,6 @@ impl TunnelStore {
         Ok(())
     }
 
-    pub fn import_conf(&self, name: &str, config_text: &str) -> Result<TunnelConfig> {
-        self.validate_name(name)?;
-        let path = self.conf_path(name);
-        if path.exists() {
-            return Err(WgsplitError::TunnelExists(name.to_string()));
-        }
-        let config = self.parse_conf(config_text, name)?;
-        self.write_conf(&config)?;
-        Ok(config)
-    }
-
     fn conf_path(&self, name: &str) -> std::path::PathBuf {
         Path::new(&self.dir).join(format!("{name}.conf"))
     }

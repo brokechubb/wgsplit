@@ -20,7 +20,6 @@ import {
     updateTunnel,
     checkDaemon,
     listProcesses,
-    importTunnel,
 } from "./ipc";
 
 type Screen =
@@ -29,8 +28,7 @@ type Screen =
     | "split"
     | "add_app"
     | "add_domain"
-    | "pick_app"
-    | "import";
+    | "pick_app";
 
 function formatBytes(b: number): string {
     if (b === 0) return "0 B";
@@ -69,9 +67,6 @@ function App() {
         onSelect: () => {},
         scrollOffset: 0,
     });
-    const [importName, setImportName] = useState("");
-    const [importPath, setImportPath] = useState("");
-    const [importFocus, setImportFocus] = useState(0);
 
     async function refresh() {
         try {
@@ -261,12 +256,6 @@ function App() {
                 setScreen("editor");
             }
             if (key.name === "s") setScreen("split");
-            if (key.name === "i") {
-                setImportName("");
-                setImportPath("");
-                setImportFocus(0);
-                setScreen("import");
-            }
         }
     });
 
@@ -378,27 +367,6 @@ function App() {
                     viewportHeight={Math.max(5, (termHeight || 24) - 8)}
                 />
             )}
-            {screen === "import" && (
-                <TunnelImporter
-                    name={importName}
-                    setName={setImportName}
-                    path={importPath}
-                    setPath={setImportPath}
-                    focusIdx={importFocus}
-                    setFocusIdx={setImportFocus}
-                    onImport={async () => {
-                        try {
-                            const text = await Bun.file(importPath).text();
-                            await importTunnel(importName || "imported", text);
-                            await refresh();
-                            setSelectedIdx(0);
-                            setScreen("main");
-                        } catch (e: any) {
-                            setError(e.message);
-                        }
-                    }}
-                />
-            )}
 
             <box border borderColor="#7aa2f7" paddingX={1} flexShrink={0}>
                 <box
@@ -408,7 +376,7 @@ function App() {
                 >
                     {screen === "main" && (
                         <text fg="#c0caf5">
-                            [c] connect [s] split [e] edit [a] add [i] import
+                            [c] connect [s] split [e] edit [a] add
                         </text>
                     )}
                     {screen === "editor" && (
@@ -420,11 +388,6 @@ function App() {
                     {screen === "pick_app" && (
                         <text fg="#c0caf5">
                             [/] filter [enter] select [esc] cancel
-                        </text>
-                    )}
-                    {screen === "import" && (
-                        <text fg="#c0caf5">
-                            [↑/↓/tab] next [enter] import [esc] cancel
                         </text>
                     )}
                     <text fg="#c0caf5">
@@ -983,63 +946,3 @@ function ProcessPicker({
 
 const renderer = await createCliRenderer({ exitOnCtrlC: false });
 createRoot(renderer).render(<App />);
-
-function TunnelImporter({
-    name,
-    setName,
-    path,
-    setPath,
-    focusIdx,
-    setFocusIdx,
-    onImport,
-}: {
-    name: string;
-    setName: (v: string) => void;
-    path: string;
-    setPath: (v: string) => void;
-    focusIdx: number;
-    setFocusIdx: (v: number) => void;
-    onImport: () => void;
-}) {
-    useKeyboard((key) => {
-        if (key.name === "tab" || key.name === "down") {
-            setFocusIdx((focusIdx + 1) % 2);
-        }
-        if (key.name === "up") {
-            setFocusIdx((focusIdx - 1 + 2) % 2);
-        }
-        if (key.name === "return") {
-            onImport();
-        }
-    });
-
-    return (
-        <box flexDirection="column" flexGrow={1} paddingX={1}>
-            <text fg="#7aa2f7"><strong>Import Tunnel</strong></text>
-            <box flexDirection="row" gap={1}>
-                <text fg={focusIdx === 0 ? "#7aa2f7" : "#565f89"}>
-                    {focusIdx === 0 ? ">" : " "}Name:
-                </text>
-                <input
-                    value={name}
-                    onChange={setName}
-                    focused={focusIdx === 0}
-                    width={50}
-                    backgroundColor="#1a1b26"
-                />
-            </box>
-            <box flexDirection="row" gap={1}>
-                <text fg={focusIdx === 1 ? "#7aa2f7" : "#565f89"}>
-                    {focusIdx === 1 ? ">" : " "}File:
-                </text>
-                <input
-                    value={path}
-                    onChange={setPath}
-                    focused={focusIdx === 1}
-                    width={50}
-                    backgroundColor="#1a1b26"
-                />
-            </box>
-        </box>
-    );
-}
