@@ -21,6 +21,6 @@ fn main() -> anyhow::Result<()> {
     }
 
     rt.block_on(async {
-        wgsplitd::run(config).await
+        wgsplitd::run_with_state(state).await
     })
 }

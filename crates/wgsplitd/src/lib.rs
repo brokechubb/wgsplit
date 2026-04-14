@@ -52,7 +52,10 @@ impl AppState {
 
 pub async fn run(config: DaemonConfig) -> anyhow::Result<()> {
     let state = Arc::new(AppState::new(config)?);
+    run_with_state(state).await
+}
 
+pub async fn run_with_state(state: Arc<AppState>) -> anyhow::Result<()> {
     state.cleanup_stale();
 
     info!("wgsplitd starting");
