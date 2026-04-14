@@ -16,14 +16,14 @@ impl RoutingManager {
 
     pub fn add_host_route_vpn(&self, ip: &str, iface: &str) -> Result<()> {
         debug!("Adding VPN host route: {ip} dev {iface}");
-        self.run_cmd("ip", &["route", "add", ip, "dev", iface])
+        self.run_cmd("ip", &["route", "replace", ip, "dev", iface])
     }
 
     pub fn add_host_route_direct(&self, ip: &str) -> Result<()> {
         let gw = self.get_default_gateway()?;
         let dev = self.get_default_interface()?;
         debug!("Adding direct host route: {ip} via {gw} dev {dev}");
-        self.run_cmd("ip", &["route", "add", ip, "via", &gw, "dev", &dev])
+        self.run_cmd("ip", &["route", "replace", ip, "via", &gw, "dev", &dev])
     }
 
     pub fn del_host_route(&self, ip: &str) -> Result<()> {

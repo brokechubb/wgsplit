@@ -54,6 +54,8 @@ impl HostRoutesManager {
                     if let Ok(()) = route_result {
                         new_routes.insert(ip.clone(), key.clone());
                         debug!("Added host route: {ip} → {direction}");
+                    } else {
+                        debug!("Skipped host route {ip} → {direction} (add failed, keeping existing if present)");
                     }
                 }
             }
