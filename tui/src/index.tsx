@@ -513,37 +513,20 @@ function TunnelList({
                                     <text fg="#9ece6a">● CONNECTED</text>
                                 )}
                             </box>
-                            <box flexDirection="row" gap={2} paddingLeft={2}>
-                                {host ? (
-                                    <text fg="#565f89">endpoint: {host}</text>
-                                ) : null}
-                                {addrs ? (
-                                    <text fg="#565f89">addr: {addrs}</text>
-                                ) : null}
-                                {peer?.allowed_ips ? (
-                                    <text fg="#565f89">
-                                        routes: {peer.allowed_ips.join(", ")}
-                                    </text>
-                                ) : null}
-                                {isActive && splitEnabled && (
-                                    <text fg="#7aa2f7">split:on</text>
-                                )}
+                            <box flexDirection="row" width="100%" justifyContent="space-between" paddingLeft={2}>
+                                <text fg="#a9b1d6">
+                                    {host ? `endpoint: ${host}` : ""}
+                                    {addrs ? `  addr: ${addrs}` : ""}
+                                    {peer?.allowed_ips ? `  routes: ${peer.allowed_ips.join(", ")}` : ""}
+                                </text>
                             </box>
                             {isActive && stats && (
-                                <box flexDirection="row" gap={2} paddingLeft={2}>
-                                    <text fg="#565f89">
-                                        ↓{formatBytes(stats.rx_bytes)}
-                                    </text>
-                                    <text fg="#565f89">
-                                        ↑{formatBytes(stats.tx_bytes)}
-                                    </text>
-                                    <text fg="#565f89">
-                                        handshake: {formatHandshake(stats.latest_handshake)}
+                                <box flexDirection="row" width="100%" justifyContent="space-between" paddingLeft={2}>
+                                    <text fg="#a9b1d6">
+                                        ↓{formatBytes(stats.rx_bytes)}  ↑{formatBytes(stats.tx_bytes)}  handshake: {formatHandshake(stats.latest_handshake)}
                                     </text>
                                     {splitEnabled && splitRoutes > 0 && (
-                                        <text fg="#565f89">
-                                            {splitRoutes} split routes
-                                        </text>
+                                        <text fg="#7aa2f7">{splitRoutes} split routes</text>
                                     )}
                                 </box>
                             )}
