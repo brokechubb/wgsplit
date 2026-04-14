@@ -1,3 +1,15 @@
+# Build artifacts
 /target/
+
+# TUI
 /tui/node_modules/
 /tui/.opentui/
+/tui/wgsplit
+/tui/wgsplit-tui
+/tui/bun.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
