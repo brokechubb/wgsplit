@@ -75,6 +75,9 @@ export async function generateKeypair() {
 export async function listProcesses() {
   return sendRequest("list_processes");
 }
+export async function importTunnel(name: string, configText: string) {
+  return sendRequest("import_tunnel", { name, config_text: configText });
+}
 export async function checkDaemon() {
   return sendRequest("ping");
 }
