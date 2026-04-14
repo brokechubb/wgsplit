@@ -290,6 +290,7 @@ function App() {
                     connected={connected}
                     stats={stats}
                     splitEnabled={settings?.split_tunneling?.enabled || false}
+                    splitRoutes={status?.split_routes || 0}
                 />
             )}
             {screen === "editor" && (
@@ -450,6 +451,15 @@ function App() {
     );
 }
 
+function formatHandshake(ts: number | null | undefined): string {
+    if (!ts || ts === 0) return "never";
+    const ago = Math.floor(Date.now() / 1000) - ts;
+    if (ago < 0) return "just now";
+    if (ago < 60) return `${ago}s ago`;
+    if (ago < 3600) return `${Math.floor(ago / 60)}m ago`;
+    return `${Math.floor(ago / 3600)}h ago`;
+}
+
 function TunnelList({
     tunnels,
     selectedIdx,
@@ -457,6 +467,7 @@ function TunnelList({
     connected,
     stats,
     splitEnabled,
+    splitRoutes,
 }: {
     tunnels: any[];
     selectedIdx: number;
@@ -464,6 +475,7 @@ function TunnelList({
     connected: boolean;
     stats: any;
     splitEnabled: boolean;
+    splitRoutes: number;
 }) {
     return (
         <scrollbox focused flexGrow={1} minHeight={3}>
@@ -488,29 +500,16 @@ function TunnelList({
                             paddingX={1}
                             marginBottom={1}
                         >
-                            <box flexDirection="row" width="100%" gap={2}>
+                            <box flexDirection="row" width="100%">
                                 <text fg={isSelected ? "#7aa2f7" : "#c0caf5"}>
                                     {isSelected ? ">" : " "}
                                 </text>
                                 <text fg={isActive ? "#9ece6a" : "#c0caf5"}>
                                     <strong>{tunnel.name}</strong>
                                 </text>
-                                {isActive && (
-                                    <text fg="#9ece6a">● connected</text>
-                                )}
-                                {isActive && stats && (
-                                    <>
-                                        <text fg="#565f89">
-                                            ↓{formatBytes(stats.rx_bytes)}
-                                        </text>
-                                        <text fg="#565f89">
-                                            ↑{formatBytes(stats.tx_bytes)}
-                                        </text>
-                                    </>
-                                )}
                                 <box flexGrow={1} justifyContent="flex-end">
-                                    {isActive && splitEnabled && (
-                                        <text fg="#7aa2f7">split:on</text>
+                                    {isActive && (
+                                        <text fg="#9ece6a">● CONNECTED</text>
                                     )}
                                 </box>
                             </box>
@@ -526,7 +525,28 @@ function TunnelList({
                                         routes: {peer.allowed_ips.join(", ")}
                                     </text>
                                 ) : null}
+                                {isActive && splitEnabled && (
+                                    <text fg="#7aa2f7">split:on</text>
+                                )}
                             </box>
+                            {isActive && stats && (
+                                <box flexDirection="row" gap={2} paddingLeft={2}>
+                                    <text fg="#565f89">
+                                        ↓{formatBytes(stats.rx_bytes)}
+                                    </text>
+                                    <text fg="#565f89">
+                                        ↑{formatBytes(stats.tx_bytes)}
+                                    </text>
+                                    <text fg="#565f89">
+                                        handshake: {formatHandshake(stats.latest_handshake)}
+                                    </text>
+                                    {splitEnabled && splitRoutes > 0 && (
+                                        <text fg="#565f89">
+                                            {splitRoutes} split routes
+                                        </text>
+                                    )}
+                                </box>
+                            )}
                         </box>
                     );
                 })}

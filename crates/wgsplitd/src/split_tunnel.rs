@@ -106,6 +106,10 @@ impl SplitTunnelManager {
         Ok(())
     }
 
+    pub fn route_count(&self) -> usize {
+        self.host_routes.blocking_read().route_count()
+    }
+
     pub fn disable(&self) -> Result<()> {
         {
             let mut cgroup = self.cgroup.lock().unwrap();

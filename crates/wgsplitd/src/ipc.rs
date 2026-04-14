@@ -198,6 +198,7 @@ impl IpcServer {
 
             Request::GetStatus => {
                 let active_name = state.active_tunnel.blocking_read().clone();
+                let split_routes = state.split_tunnel.route_count();
                 match active_name {
                     Some(name) => {
                         let iface = format!("wg-{name}");
@@ -207,6 +208,7 @@ impl IpcServer {
                             connected: true,
                             interface: iface,
                             stats,
+                            split_routes,
                         })
                     }
                     None => Response::ok(TunnelStatus {
@@ -214,6 +216,7 @@ impl IpcServer {
                         connected: false,
                         interface: String::new(),
                         stats: None,
+                        split_routes: 0,
                     }),
                 }
             }

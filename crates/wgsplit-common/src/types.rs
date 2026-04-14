@@ -147,6 +147,7 @@ pub struct TunnelStatus {
     pub connected: bool,
     pub interface: String,
     pub stats: Option<TunnelStats>,
+    pub split_routes: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
