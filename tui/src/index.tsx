@@ -5,7 +5,7 @@ import {
     useRenderer,
     useTerminalDimensions,
 } from "@opentui/react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
     listTunnels,
     connectTunnel,
@@ -67,6 +67,7 @@ function App() {
         onSelect: () => {},
         scrollOffset: 0,
     });
+    const [pendingApps, setPendingApps] = useState<{ vpn: string[]; direct: string[] } | null>(null);
 
     async function refresh() {
         try {
@@ -256,6 +257,7 @@ function App() {
                 setScreen("editor");
             }
             if (key.name === "s") setScreen("split");
+            return;
         }
     });
 
@@ -316,48 +318,36 @@ function App() {
                     onSave={async (s) => {
                         try {
                             await setSplitTunneling(s);
-                            refresh();
+                            await refresh();
                         } catch (e: any) {
                             setError(e.message);
                         }
                     }}
-                    onPickApp={async () => {
-                        const p = await listProcesses();
-                        const procs = (p || []).sort((a: any, b: any) =>
-                            a.name.localeCompare(b.name),
-                        );
-                        setPickAppRef({
-                            procs,
-                            filtered: procs,
-                            selectedIdx: 0,
-                            filter: "",
-                            filtering: false,
-                            scrollOffset: 0,
-                            onSelect: (exe: string) => {
-                                setSettings((prev: any) => {
-                                    const s = { ...prev };
-                                    s.split_tunneling = {
-                                        ...s.split_tunneling,
-                                    };
-                                    const apps = { ...s.split_tunneling.apps };
-                                    if (
-                                        s.split_tunneling.mode === "inclusive"
-                                    ) {
-                                        apps.vpn = [...(apps.vpn || []), exe];
-                                    } else {
-                                        apps.direct = [
-                                            ...(apps.direct || []),
-                                            exe,
-                                        ];
-                                    }
-                                    s.split_tunneling.apps = apps;
-                                    return s;
-                                });
-                                setScreen("split");
-                            },
-                        });
-                        setScreen("pick_app");
-                    }}
+  onPickApp={async (currentVpnApps: string[], currentDirectApps: string[], currentMode: string) => {
+    const p = await listProcesses();
+    const procs = (p || []).sort((a: any, b: any) =>
+      a.name.localeCompare(b.name),
+    );
+    setPickAppRef({
+      procs,
+      filtered: procs,
+      selectedIdx: 0,
+      filter: "",
+      filtering: false,
+      scrollOffset: 0,
+      onSelect: (exe: string) => {
+        if (currentMode === "inclusive") {
+          setPendingApps({ vpn: [...currentVpnApps, exe], direct: currentDirectApps });
+        } else {
+          setPendingApps({ vpn: currentVpnApps, direct: [...currentDirectApps, exe] });
+        }
+        setScreen("split");
+      },
+    });
+    setScreen("pick_app");
+  }}
+  pendingApps={pendingApps}
+  onClearPendingApps={() => setPendingApps(null)}
                 />
             )}
             {screen === "pick_app" && (
@@ -433,6 +423,7 @@ function App() {
                             <text fg="#c0caf5"> [2] toggle mode</text>
                             <text fg="#c0caf5"> [a] add application</text>
                             <text fg="#c0caf5"> [d] add domain/IP</text>
+                            <text fg="#c0caf5"> [x] remove selected</text>
                             <text fg="#c0caf5"> [s] save / apply</text>
                             <text> </text>
                             <text fg="#9ece6a">
@@ -686,45 +677,110 @@ function SplitTunnelView({
     connected,
     onSave,
     onPickApp,
+    pendingApps,
+    onClearPendingApps,
 }: {
     settings: any;
     connected: boolean;
-    onSave: (s: any) => void;
-    onPickApp: () => void;
+    onSave: (s: any) => Promise<void>;
+    onPickApp: (
+        currentVpnApps: string[],
+        currentDirectApps: string[],
+        currentMode: string,
+    ) => void;
+    pendingApps?: { vpn: string[]; direct: string[] } | null;
+    onClearPendingApps?: () => void;
 }) {
-    const [enabled, setEnabled] = useState(settings?.enabled || false);
-    const [mode, setMode] = useState(settings?.mode || "exclusive");
-    const [vpnApps, setVpnApps] = useState<string[]>(settings?.apps?.vpn || []);
-    const [directApps, setDirectApps] = useState<string[]>(
-        settings?.apps?.direct || [],
+    const settingsVpn = settings?.apps?.vpn || [];
+    const settingsDirect = settings?.apps?.direct || [];
+    const settingsVpnDomains = settings?.domains?.vpn || [];
+    const settingsDirectDomains = settings?.domains?.direct || [];
+
+    const [localOverrides, setLocalOverrides] = useState<{
+        enabled?: boolean;
+        mode?: string;
+        vpnApps?: string[];
+        directApps?: string[];
+        vpnDomains?: string[];
+        directDomains?: string[];
+    }>(() =>
+        pendingApps
+            ? { vpnApps: pendingApps.vpn, directApps: pendingApps.direct }
+            : {},
     );
-    const [vpnDomains, setVpnDomains] = useState<string[]>(
-        settings?.domains?.vpn || [],
-    );
-    const [directDomains, setDirectDomains] = useState<string[]>(
-        settings?.domains?.direct || [],
-    );
+    useEffect(() => {
+        if (pendingApps) onClearPendingApps?.();
+    }, []);
+
+    const enabled = localOverrides.enabled ?? settings?.enabled ?? false;
+    const mode = localOverrides.mode ?? settings?.mode ?? "exclusive";
+    const vpnApps: string[] = localOverrides.vpnApps ?? settingsVpn;
+    const directApps: string[] = localOverrides.directApps ?? settingsDirect;
+    const vpnDomains: string[] = localOverrides.vpnDomains ?? settingsVpnDomains;
+    const directDomains: string[] = localOverrides.directDomains ?? settingsDirectDomains;
+
     const [newApp, setNewApp] = useState("");
     const [newDomain, setNewDomain] = useState("");
     const [inputMode, setInputMode] = useState<"none" | "app" | "domain">(
         "none",
     );
     const [focusIdx, setFocusIdx] = useState(0);
+    const [appSelIdx, setAppSelIdx] = useState(0);
+    const [domainSelIdx, setDomainSelIdx] = useState(0);
+
+    const allApps = [...directApps.map((a) => ({ t: "d" as const, v: a })), ...vpnApps.map((a) => ({ t: "v" as const, v: a }))];
+    const allDomains = [...directDomains.map((d) => ({ t: "d" as const, v: d })), ...vpnDomains.map((d) => ({ t: "v" as const, v: d }))];
 
     useKeyboard((key) => {
         if (inputMode === "none") {
             if (key.name === "1") {
-                setEnabled(!enabled);
+                setLocalOverrides((o) => ({ ...o, enabled: !enabled }));
             }
             if (key.name === "2") {
-                setMode(mode === "exclusive" ? "inclusive" : "exclusive");
+                setLocalOverrides((o) => ({
+                    ...o,
+                    mode: mode === "exclusive" ? "inclusive" : "exclusive",
+                }));
             }
             if (key.name === "a") {
-                onPickApp();
+                onPickApp(vpnApps, directApps, mode);
             }
             if (key.name === "d") {
                 setInputMode("domain");
                 setFocusIdx(1);
+            }
+            if (key.name === "x") {
+                if (focusIdx === 0 && allApps.length > 0) {
+                    const idx = Math.min(appSelIdx, allApps.length - 1);
+                    const sel = allApps[idx]!;
+                    if (sel.t === "d") {
+                        setLocalOverrides((o) => ({
+                            ...o,
+                            directApps: directApps.filter((a) => a !== sel.v),
+                        }));
+                    } else {
+                        setLocalOverrides((o) => ({
+                            ...o,
+                            vpnApps: vpnApps.filter((a) => a !== sel.v),
+                        }));
+                    }
+                    setAppSelIdx((i) => Math.max(0, Math.min(i, allApps.length - 2)));
+                } else if (focusIdx === 1 && allDomains.length > 0) {
+                    const idx = Math.min(domainSelIdx, allDomains.length - 1);
+                    const sel = allDomains[idx]!;
+                    if (sel.t === "d") {
+                        setLocalOverrides((o) => ({
+                            ...o,
+                            directDomains: directDomains.filter((d) => d !== sel.v),
+                        }));
+                    } else {
+                        setLocalOverrides((o) => ({
+                            ...o,
+                            vpnDomains: vpnDomains.filter((d) => d !== sel.v),
+                        }));
+                    }
+                    setDomainSelIdx((i) => Math.max(0, Math.min(i, allDomains.length - 2)));
+                }
             }
             if (key.name === "s") {
                 onSave({
@@ -736,19 +792,31 @@ function SplitTunnelView({
                         direct: directDomains,
                         resolve_interval_secs: 300,
                     },
+                }).then(() => {
+                    setLocalOverrides({});
                 });
             }
         } else {
             if (key.name === "return") {
                 if (inputMode === "app" && newApp.trim()) {
                     if (mode === "exclusive")
-                        setDirectApps([...directApps, newApp.trim()]);
-                    else setVpnApps([...vpnApps, newApp.trim()]);
+                        setLocalOverrides((o) => ({
+                            ...o,
+                            directApps: [...directApps, newApp.trim()],
+                        }));
+                    else
+                        setLocalOverrides((o) => ({
+                            ...o,
+                            vpnApps: [...vpnApps, newApp.trim()],
+                        }));
                     setNewApp("");
                     setInputMode("none");
                 }
                 if (inputMode === "domain" && newDomain.trim()) {
-                    setVpnDomains([...vpnDomains, newDomain.trim()]);
+                    setLocalOverrides((o) => ({
+                        ...o,
+                        vpnDomains: [...vpnDomains, newDomain.trim()],
+                    }));
                     setNewDomain("");
                     setInputMode("none");
                 }
@@ -757,8 +825,18 @@ function SplitTunnelView({
                 setInputMode("none");
             }
         }
-        if (key.name === "tab") setFocusIdx((i) => (i === 0 ? 1 : 0));
-    });
+            if (key.name === "tab") setFocusIdx((i) => (i === 0 ? 1 : 0));
+            if (inputMode === "none") {
+                if (key.name === "up") {
+                    if (focusIdx === 0) setAppSelIdx((i) => Math.max(0, i - 1));
+                    else setDomainSelIdx((i) => Math.max(0, i - 1));
+                }
+                if (key.name === "down") {
+                    if (focusIdx === 0) setAppSelIdx((i) => Math.min(allApps.length - 1, i + 1));
+                    else setDomainSelIdx((i) => Math.min(allDomains.length - 1, i + 1));
+                }
+            }
+        });
 
     if (!connected) {
         return (
@@ -793,41 +871,35 @@ function SplitTunnelView({
 
                 <text> </text>
 
-                <box border borderColor="#3b4261" paddingX={1}>
+                <box border borderColor={focusIdx === 0 ? "#7aa2f7" : "#3b4261"} paddingX={1}>
                     <box flexDirection="column">
                         <text fg="#7aa2f7">
-                            <strong>Applications</strong> [a] add
+                            <strong>Applications</strong> [a] add [x] remove
                         </text>
-                        {directApps.map((app, i) => (
-                            <text key={"d" + i} fg="#9ece6a">
-                                direct: {app.split("/").pop()}
-                            </text>
+                        {allApps.map((app, i) => (
+                            <box key={app.t + i} backgroundColor={focusIdx === 0 && i === appSelIdx ? "#2f3349" : undefined}>
+                                <text fg={app.t === "d" ? "#9ece6a" : "#7aa2f7"}>
+                                    {focusIdx === 0 && i === appSelIdx ? "> " : "  "}{app.t === "d" ? "direct" : "vpn"}: {app.v.split("/").pop()}
+                                </text>
+                            </box>
                         ))}
-                        {vpnApps.map((app, i) => (
-                            <text key={"v" + i} fg="#7aa2f7">
-                                vpn: {app.split("/").pop()}
-                            </text>
-                        ))}
-                        {directApps.length === 0 && vpnApps.length === 0 && (
+                        {allApps.length === 0 && (
                             <text fg="#565f89">No apps configured</text>
                         )}
                     </box>
                 </box>
 
-                <box border borderColor="#3b4261" paddingX={1}>
+                <box border borderColor={focusIdx === 1 ? "#7aa2f7" : "#3b4261"} paddingX={1}>
                     <box flexDirection="column">
                         <text fg="#7aa2f7">
-                            <strong>Domains / IPs</strong> [d] add
+                            <strong>Domains / IPs</strong> [d] add [x] remove
                         </text>
-                        {vpnDomains.map((d, i) => (
-                            <text key={"vd" + i} fg="#7aa2f7">
-                                vpn: {d}
-                            </text>
-                        ))}
-                        {directDomains.map((d, i) => (
-                            <text key={"dd" + i} fg="#9ece6a">
-                                direct: {d}
-                            </text>
+                        {allDomains.map((d, i) => (
+                            <box key={d.t + i} backgroundColor={focusIdx === 1 && i === domainSelIdx ? "#2f3349" : undefined}>
+                                <text fg={d.t === "d" ? "#9ece6a" : "#7aa2f7"}>
+                                    {focusIdx === 1 && i === domainSelIdx ? "> " : "  "}{d.t === "d" ? "direct" : "vpn"}: {d.v}
+                                </text>
+                            </box>
                         ))}
                             {vpnDomains.length === 0 &&
                             directDomains.length === 0 && (

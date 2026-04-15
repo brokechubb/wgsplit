@@ -11,7 +11,6 @@ pub struct CgroupManager {
     enabled: bool,
 }
 
-#[allow(dead_code)]
 impl CgroupManager {
     pub fn new() -> Result<Self> {
         let cgroup_path = format!("{CGROUP_ROOT}/{CGROUP_NAME}");
@@ -58,7 +57,12 @@ impl CgroupManager {
         }
         let procs_path = format!("{}/cgroup.procs", self.cgroup_path);
         debug!("Adding PID {pid} to cgroup {CGROUP_NAME}");
-        fs::write(&procs_path, pid.to_string()).map_err(|e| {
+        use std::io::Write;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&procs_path)
+            .map_err(|e| WgsplitError::Cgroup(format!("Failed to open cgroup.procs: {e}")))?;
+        write!(f, "{pid}").map_err(|e| {
             WgsplitError::Cgroup(format!("Failed to add PID {pid} to cgroup: {e}"))
         })
     }
@@ -69,33 +73,6 @@ impl CgroupManager {
         }
         debug!("Removing PID {pid} from cgroup {CGROUP_NAME}");
         Ok(())
-    }
-
-    pub fn scan_existing(&self, app_paths: &[String]) -> Result<Vec<u32>> {
-        let mut matched = Vec::new();
-        let proc = Path::new("/proc");
-        for entry in fs::read_dir(proc)? {
-            let entry = entry?;
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            let pid: u32 = match name_str.parse() {
-                Ok(p) => p,
-                Err(_) => continue,
-            };
-            let exe_path = format!("/proc/{pid}/exe");
-            if let Ok(target) = fs::read_link(&exe_path) {
-                let target_str = target.to_string_lossy();
-                for app in app_paths {
-                    if target_str == *app || target_str.ends_with(app) {
-                        debug!("Found existing process {pid}: {target_str} matches {app}");
-                        matched.push(pid);
-                        break;
-                    }
-                }
-            }
-        }
-        info!("Scan found {} matching processes", matched.len());
-        Ok(matched)
     }
 
     pub fn is_enabled(&self) -> bool {

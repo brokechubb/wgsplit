@@ -160,13 +160,26 @@ pub fn start_process_monitor_loop(
                                 mon.check_process(pid)
                             };
                             if let Some(app) = app {
-                                info!("New matching process: PID={pid} app={app}");
-                                let cg = cgroup.lock().unwrap();
-                                if !cg.is_enabled() {
-                                    continue;
-                                }
-                                if let Err(e) = cg.add_pid(pid) {
-                                    warn!("Failed to add PID {pid} to cgroup: {e}");
+                                info!(
+                                    "Process {pid} ({app}) detected — adding to cgroup. \
+                                     Note: any existing connections will not be rerouted."
+                                );
+                                let added = {
+                                    let cg = cgroup.lock().unwrap();
+                                    if !cg.is_enabled() {
+                                        false
+                                    } else {
+                                        match cg.add_pid(pid) {
+                                            Ok(()) => true,
+                                            Err(e) => {
+                                                warn!("Failed to add PID {pid} to cgroup: {e}");
+                                                false
+                                            }
+                                        }
+                                    }
+                                };
+                                if added {
+                                    monitor.lock().unwrap().add_pid(pid, app);
                                 }
                             }
                         }

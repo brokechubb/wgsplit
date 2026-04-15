@@ -26,6 +26,10 @@ impl HostRoutesManager {
         self.vpn_iface = None;
     }
 
+    pub fn vpn_interface(&self) -> Option<&String> {
+        self.vpn_iface.as_ref()
+    }
+
     pub fn update_routes(&mut self, resolved: &HashMap<String, Vec<String>>) -> Result<()> {
         let mut new_routes = HashMap::new();
 
@@ -81,6 +85,10 @@ impl HostRoutesManager {
         }
         self.current_routes.clear();
         Ok(())
+    }
+
+    pub fn get_default_iface(&self) -> wgsplit_common::error::Result<String> {
+        self.routing.get_default_interface()
     }
 
     #[allow(dead_code)]

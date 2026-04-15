@@ -21,7 +21,7 @@ pub use split_tunnel::SplitTunnelManager;
 pub use ipc::IpcServer;
 
 pub struct AppState {
-    pub config: DaemonConfig,
+    pub config: std::sync::RwLock<DaemonConfig>,
     pub tunnel_store: TunnelStore,
     pub wg_manager: WireGuardManager,
     pub split_tunnel: SplitTunnelManager,
@@ -30,14 +30,18 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: DaemonConfig) -> anyhow::Result<Self> {
-        let tunnel_store = TunnelStore::new(&config.tunnel_dir)?;
-        let wg_manager = WireGuardManager::new(config.routing_table, config.fwmark);
+        let _socket_path = config.socket_path.clone();
+        let tunnel_dir = config.tunnel_dir.clone();
+        let routing_table = config.routing_table;
+        let fwmark = config.fwmark;
+        let tunnel_store = TunnelStore::new(&tunnel_dir)?;
+        let wg_manager = WireGuardManager::new(routing_table, fwmark);
         let split_tunnel = SplitTunnelManager::new(
-            config.fwmark,
-            config.routing_table,
+            fwmark,
+            routing_table,
         )?;
         Ok(Self {
-            config,
+            config: std::sync::RwLock::new(config),
             tunnel_store,
             wg_manager,
             split_tunnel,
@@ -60,6 +64,7 @@ pub async fn run_with_state(state: Arc<AppState>) -> anyhow::Result<()> {
 
     info!("wgsplitd starting");
 
-    let ipc_server = IpcServer::new(state.clone(), &state.config.socket_path)?;
+    let socket_path = state.config.read().unwrap().socket_path.clone();
+    let ipc_server = IpcServer::new(state.clone(), &socket_path)?;
     ipc_server.run().await
 }

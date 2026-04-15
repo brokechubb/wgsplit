@@ -149,22 +149,23 @@ impl IpcServer {
                     }
                 }
 
-                match state.wg_manager.connect(&config, &state.config.tunnel_dir) {
-                    Ok(iface) => {
-                        if let Err(e) = state.split_tunnel.on_tunnel_connected(&iface) {
-                            warn!("Split tunnel on-connect failed: {e}");
+            let tunnel_dir = state.config.read().unwrap().tunnel_dir.clone();
+            match state.wg_manager.connect(&config, &tunnel_dir) {
+                Ok(iface) => {
+                    if let Err(e) = state.split_tunnel.on_tunnel_connected(&iface) {
+                        warn!("Split tunnel on-connect failed: {e}");
+                    }
+                    let settings = state.config.read().unwrap().settings.split_tunneling.clone();
+                    if settings.enabled {
+                        if let Err(e) = state.split_tunnel.apply_settings(&settings) {
+                            warn!("Failed to re-apply split tunneling on connect: {e}");
                         }
-                        let settings = state.config.settings.split_tunneling.clone();
-                        if settings.enabled {
-                            if let Err(e) = state.split_tunnel.apply_settings(&settings) {
-                                warn!("Failed to re-apply split tunneling on connect: {e}");
-                            }
-                        }
-                        let mut active = state.active_tunnel.blocking_write();
-                        *active = Some(name.clone());
-                        Response::ok(json!({
-                            "interface": iface,
-                            "name": name,
+                    }
+                    let mut active = state.active_tunnel.blocking_write();
+                    *active = Some(name.clone());
+                    Response::ok(json!({
+                        "interface": iface,
+                        "name": name,
                         }))
                     }
                     Err(e) => Response::error(format!("Connection failed: {e}")),
@@ -222,27 +223,30 @@ impl IpcServer {
             }
 
             Request::GetSettings => {
-                Response::ok(&state.config.settings)
+                Response::ok(&state.config.read().unwrap().settings)
             }
 
             Request::UpdateSettings { settings } => {
-                match state.config.save_settings(settings) {
+                let cfg = state.config.read().unwrap();
+                match cfg.save_settings(settings) {
                     Ok(()) => Response::ok(json!("saved")),
                     Err(e) => Response::error(e.to_string()),
                 }
             }
 
-            Request::SetSplitTunneling { settings } => {
-                match state.split_tunnel.apply_settings(settings) {
-                    Ok(()) => {
-                        let mut s = state.config.settings.clone();
-                        s.split_tunneling = settings.clone();
-                        let _ = state.config.save_settings(&s);
-                        Response::ok(json!("applied"))
+        Request::SetSplitTunneling { settings } => {
+            match state.split_tunnel.apply_settings(settings) {
+                Ok(()) => {
+                    {
+                        let mut cfg = state.config.write().unwrap();
+                        cfg.settings.split_tunneling = settings.clone();
+                        let _ = cfg.save_settings(&cfg.settings);
                     }
-                    Err(e) => Response::error(e.to_string()),
+                    Response::ok(json!("applied"))
                 }
+                Err(e) => Response::error(e.to_string()),
             }
+        }
 
         Request::GenerateKeypair => {
             let (private, public) = crate::wireguard::WireGuardManager::generate_keypair();

@@ -15,10 +15,7 @@ struct DnsLoopHandle {
     cancel_flag: Arc<AtomicBool>,
 }
 
-#[allow(dead_code)]
 pub struct SplitTunnelManager {
-    fwmark: u32,
-    table: u32,
     cgroup: Arc<std::sync::Mutex<CgroupManager>>,
     process_monitor: Arc<std::sync::Mutex<ProcessMonitor>>,
     host_routes: Arc<RwLock<HostRoutesManager>>,
@@ -36,8 +33,6 @@ impl SplitTunnelManager {
         let nftables = NftablesManager::new(fwmark);
 
         Ok(Self {
-            fwmark,
-            table,
             cgroup: Arc::new(std::sync::Mutex::new(cgroup)),
             process_monitor: Arc::new(std::sync::Mutex::new(process_monitor)),
             host_routes: Arc::new(RwLock::new(host_routes)),
@@ -67,9 +62,17 @@ impl SplitTunnelManager {
             let mut monitor = self.process_monitor.lock().unwrap();
             monitor.update_app_list(app_paths.clone());
             let matched = monitor.scan_all();
+            if !matched.is_empty() {
+                log::warn!(
+                    "Adding {} already-running process(es) to cgroup. \
+                     Existing network connections will NOT be rerouted — \
+                     only new connections will use the VPN.",
+                    matched.len()
+                );
+            }
             let cgroup = self.cgroup.lock().unwrap();
-            for pid in matched {
-                if let Err(e) = cgroup.add_pid(pid) {
+            for pid in &matched {
+                if let Err(e) = cgroup.add_pid(*pid) {
                     log::warn!("Failed to add PID {pid} to cgroup: {e}");
                 }
             }
@@ -79,6 +82,17 @@ impl SplitTunnelManager {
             self.process_monitor.clone(),
             self.cgroup.clone(),
         );
+
+        {
+            let hr = self.host_routes.blocking_read();
+            if let Some(vpn_iface) = hr.vpn_interface().cloned() {
+                drop(hr);
+                let nft = self.nftables.lock().unwrap();
+                if let Err(e) = nft.setup_base(&vpn_iface) {
+                    log::warn!("Failed to setup nftables for app routing: {e}");
+                }
+            }
+        }
 
         if !settings.domains.vpn.is_empty() || !settings.domains.direct.is_empty() {
             self.start_dns_loop(settings)?;

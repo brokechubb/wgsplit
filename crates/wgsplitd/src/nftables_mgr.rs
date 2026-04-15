@@ -2,42 +2,34 @@ use std::process::Command;
 use log::{info, debug};
 use wgsplit_common::error::{Result, WgsplitError};
 
-#[allow(dead_code)]
+const CGROUP_NAME: &str = "wgsplit-vpn";
+
 pub struct NftablesManager {
     fwmark: u32,
 }
 
-#[allow(dead_code)]
 impl NftablesManager {
     pub fn new(fwmark: u32) -> Self {
         Self { fwmark }
     }
 
-    pub fn setup_base(&self, vpn_iface: &str, default_iface: &str) -> Result<()> {
+    pub fn setup_base(&self, vpn_iface: &str) -> Result<()> {
         let fwmark_hex = format!("0x{:x}", self.fwmark);
         let table_name = "wgsplit";
+
+        self.teardown()?;
 
         let ruleset = format!(
             r#"
 table inet {table_name} {{
     chain mangle {{
-        type filter hook output priority mangle; policy accept;
-        meta cgroup "wgsplit-vpn" mark set {fwmark_hex}
+        type route hook output priority mangle; policy accept;
+        socket cgroupv2 level 1 "{CGROUP_NAME}" counter meta mark set {fwmark_hex}
     }}
 
-    chain output {{
-        type filter hook output priority filter; policy accept;
-        oifname "{vpn_iface}" accept
-        oifname "lo" accept
-        ct state established,related accept
-    }}
-
-    chain killswitch {{
-        type filter hook output priority filter + 1; policy drop;
-        oifname "{vpn_iface}" accept
-        oifname "lo" accept
-        oifname "{default_iface}" udp dport 53 accept
-        ct state established,related accept
+    chain postrouting {{
+        type nat hook postrouting priority srcnat; policy accept;
+        meta mark {fwmark_hex} oifname "{vpn_iface}" masquerade
     }}
 }}
 "#
@@ -58,27 +50,11 @@ table inet {table_name} {{
             return Err(WgsplitError::Nftables("Failed to apply nftables ruleset".into()));
         }
 
-        info!("nftables base rules applied (table={table_name}, fwmark={fwmark_hex})");
+        info!("nftables app routing rules applied (table={table_name}, fwmark={fwmark_hex})");
         Ok(())
     }
 
-    pub fn add_domain_ips(&self, ips: &[String]) -> Result<()> {
-        for ip in ips {
-            debug!("Adding nftables allow rule for {ip}");
-            let spec = format!("ip daddr {ip} accept");
-            let _ = Command::new("nft")
-                .args(["add", "rule", "inet", "wgsplit", "output", &spec])
-                .status();
-        }
-        Ok(())
-    }
-
-    pub fn remove_domain_ips(&self, _ips: &[String]) -> Result<()> {
-        let _ = self.flush_ruleset();
-        Ok(())
-    }
-
-    pub fn enable_killswitch(&self, vpn_iface: &str, _default_iface: &str, dns_ips: &[String]) -> Result<()> {
+    pub fn enable_killswitch(&self, vpn_iface: &str, dns_ips: &[String]) -> Result<()> {
         self.teardown()?;
 
         let fwmark_hex = format!("0x{:x}", self.fwmark);
@@ -95,8 +71,13 @@ table inet {table_name} {{
             r#"
 table inet wgsplit {{
     chain mangle {{
-        type filter hook output priority mangle; policy accept;
-        meta cgroup "wgsplit-vpn" mark set {fwmark_hex}
+        type route hook output priority mangle; policy accept;
+        socket cgroupv2 level 1 "{CGROUP_NAME}" counter meta mark set {fwmark_hex}
+    }}
+
+    chain postrouting {{
+        type nat hook postrouting priority srcnat; policy accept;
+        meta mark {fwmark_hex} oifname "{vpn_iface}" masquerade
     }}
 
     chain output {{
@@ -133,15 +114,6 @@ table inet wgsplit {{
     }
 
     pub fn teardown(&self) -> Result<()> {
-        let _ = Command::new("nft")
-            .args(["delete", "table", "inet", "wgsplit"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
-        Ok(())
-    }
-
-    fn flush_ruleset(&self) -> Result<()> {
         let _ = Command::new("nft")
             .args(["delete", "table", "inet", "wgsplit"])
             .stdout(std::process::Stdio::null())

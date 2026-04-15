@@ -41,12 +41,6 @@ impl WireGuardManager {
             "listen-port", "0",
         ])?;
 
-        if let Some(fwmark_str) = self.detect_fwmark(iface)? {
-            info!("WireGuard using fwmark {fwmark_str}");
-        } else {
-            self.run_cmd("wg", &["set", iface, "fwmark", &format!("0x{:x}", self.fwmark)])?;
-        }
-
         for addr in &config.interface.address {
             self.run_cmd("ip", &["address", "add", addr, "dev", iface])?;
         }
@@ -250,16 +244,6 @@ impl WireGuardManager {
             WgsplitError::Routing("No default interface found".into())
         })?;
         Ok(parts.get(dev_idx + 1).unwrap_or(&"").to_string())
-    }
-
-    fn detect_fwmark(&self, iface: &str) -> Result<Option<String>> {
-        let output = self.run_cmd_capture("wg", &["show", iface, "fwmark"])?;
-        let trimmed = output.trim();
-        if trimmed.is_empty() || trimmed == "(none)" {
-            Ok(None)
-        } else {
-            Ok(Some(trimmed.to_string()))
-        }
     }
 
     fn write_keyfile(&self, key: &str, tunnel_dir: &str, name: &str, suffix: &str) -> Result<String> {
