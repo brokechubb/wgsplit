@@ -153,6 +153,19 @@ function App() {
                             filtered.length - 1,
                         ),
                     }));
+                } else if (key.name === "up") {
+                    setPickAppRef((r) => ({
+                        ...r,
+                        selectedIdx: Math.max(0, r.selectedIdx - 1),
+                    }));
+                } else if (key.name === "down") {
+                    setPickAppRef((r) => ({
+                        ...r,
+                        selectedIdx: Math.min(
+                            r.filtered.length - 1,
+                            r.selectedIdx + 1,
+                        ),
+                    }));
                 } else if (
                     key.name &&
                     key.name.length === 1 &&
@@ -221,7 +234,16 @@ function App() {
             if (key.name === "down")
                 setSelectedIdx((i) => Math.min(tunnels.length - 1, i + 1));
             if (key.name === "return") {
-                setScreen("split");
+                if (connected) {
+                    setScreen("split");
+                } else {
+                    const tunnel = tunnels[selectedIdx];
+                    if (tunnel) {
+                        connectTunnel(tunnel.name)
+                            .then(refresh)
+                            .catch((e) => setError(e.message));
+                    }
+                }
             }
             if (key.name === "c") {
                 const tunnel = tunnels[selectedIdx];
@@ -237,6 +259,11 @@ function App() {
                     }
                 }
             }
+            if (key.name === "d" && connected) {
+                disconnectTunnel()
+                    .then(refresh)
+                    .catch((e) => setError(e.message));
+            }
             if (key.name === "e") {
                 const tunnel = tunnels[selectedIdx];
                 if (tunnel) {
@@ -244,7 +271,7 @@ function App() {
                     setScreen("editor");
                 }
             }
-            if (key.name === "d" && !connected) {
+            if (key.name === "x" && !connected) {
                 const tunnel = tunnels[selectedIdx];
                 if (tunnel) {
                     deleteTunnel(tunnel.name)
@@ -410,10 +437,10 @@ function App() {
                                 {" "}
                                 [enter] open split tunneling
                             </text>
-                            <text fg="#c0caf5"> [c] connect / disconnect</text>
+                            <text fg="#c0caf5"> [c] connect / [d] disconnect</text>
                             <text fg="#c0caf5"> [e] edit tunnel</text>
                             <text fg="#c0caf5"> [a] add new tunnel</text>
-                            <text fg="#c0caf5"> [d] delete tunnel</text>
+                            <text fg="#c0caf5"> [x] delete tunnel</text>
                             <text fg="#c0caf5"> [↑/↓] navigate</text>
                             <text> </text>
                             <text fg="#9ece6a">
