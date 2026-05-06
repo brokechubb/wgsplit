@@ -131,6 +131,7 @@ impl ProcessMonitor {
 pub fn start_process_monitor_loop(
     monitor: Arc<Mutex<ProcessMonitor>>,
     cgroup: Arc<Mutex<crate::cgroup::CgroupManager>>,
+    cancel_flag: Arc<std::sync::atomic::AtomicBool>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
@@ -141,6 +142,9 @@ pub fn start_process_monitor_loop(
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
             loop {
                 interval.tick().await;
+                if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
+                    break;
+                }
                 let procs = Path::new("/proc");
                 if let Ok(entries) = fs::read_dir(procs) {
                     for entry in entries.flatten() {

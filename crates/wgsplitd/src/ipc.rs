@@ -149,20 +149,20 @@ impl IpcServer {
                     }
                 }
 
-            let tunnel_dir = state.config.read().unwrap().tunnel_dir.clone();
-            match state.wg_manager.connect(&config, &tunnel_dir) {
-                Ok(iface) => {
-                    if let Err(e) = state.split_tunnel.on_tunnel_connected(&iface) {
-                        warn!("Split tunnel on-connect failed: {e}");
+    let tunnel_dir = state.config.read().unwrap().tunnel_dir.clone();
+        match state.wg_manager.connect(&config, &tunnel_dir) {
+            Ok(iface) => {
+                if let Err(e) = state.split_tunnel.on_tunnel_connected(&iface) {
+                    warn!("Split tunnel on-connect failed: {e}");
+                }
+                if !config.interface.dns.is_empty() {
+                    let mut dns = state.dns_manager.lock().unwrap();
+                    if let Err(e) = dns.apply(&config.interface.dns) {
+                        warn!("Failed to update DNS: {e}");
                     }
-                    let settings = state.config.read().unwrap().settings.split_tunneling.clone();
-                    if settings.enabled {
-                        if let Err(e) = state.split_tunnel.apply_settings(&settings) {
-                            warn!("Failed to re-apply split tunneling on connect: {e}");
-                        }
-                    }
-                    let mut active = state.active_tunnel.blocking_write();
-                    *active = Some(name.clone());
+                }
+                let mut active = state.active_tunnel.blocking_write();
+                *active = Some(name.clone());
                     Response::ok(json!({
                         "interface": iface,
                         "name": name,
@@ -183,11 +183,18 @@ impl IpcServer {
 
                 let iface = format!("wg-{active_name}");
 
-                if let Err(e) = state.split_tunnel.on_tunnel_disconnected() {
-                    warn!("Split tunnel on-disconnect failed: {e}");
-                }
+        if let Err(e) = state.split_tunnel.on_tunnel_disconnected() {
+            warn!("Split tunnel on-disconnect failed: {e}");
+        }
 
-                match state.wg_manager.disconnect(&iface) {
+        {
+            let mut dns = state.dns_manager.lock().unwrap();
+            if let Err(e) = dns.restore() {
+                warn!("Failed to restore DNS: {e}");
+            }
+        }
+
+        match state.wg_manager.disconnect(&iface) {
                     Ok(()) => {
                         let mut active = state.active_tunnel.blocking_write();
                         *active = None;

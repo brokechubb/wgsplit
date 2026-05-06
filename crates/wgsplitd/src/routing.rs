@@ -16,19 +16,33 @@ impl RoutingManager {
 
     pub fn add_host_route_vpn(&self, ip: &str, iface: &str) -> Result<()> {
         debug!("Adding VPN host route: {ip} dev {iface}");
-        self.run_cmd("ip", &["route", "replace", ip, "dev", iface])
+        if ip.contains(':') {
+            self.run_cmd("ip", &["-6", "route", "replace", ip, "dev", iface])
+        } else {
+            self.run_cmd("ip", &["-4", "route", "replace", ip, "dev", iface])
+        }
     }
 
     pub fn add_host_route_direct(&self, ip: &str) -> Result<()> {
-        let gw = self.get_default_gateway()?;
-        let dev = self.get_default_interface()?;
-        debug!("Adding direct host route: {ip} via {gw} dev {dev}");
-        self.run_cmd("ip", &["route", "replace", ip, "via", &gw, "dev", &dev])
+        if ip.contains(':') {
+            let dev = self.get_default_interface_v6()?;
+            debug!("Adding direct host route: {ip} dev {dev}");
+            self.run_cmd("ip", &["-6", "route", "replace", ip, "dev", &dev])
+        } else {
+            let gw = self.get_default_gateway()?;
+            let dev = self.get_default_interface()?;
+            debug!("Adding direct host route: {ip} via {gw} dev {dev}");
+            self.run_cmd("ip", &["-4", "route", "replace", ip, "via", &gw, "dev", &dev])
+        }
     }
 
     pub fn del_host_route(&self, ip: &str) -> Result<()> {
         debug!("Deleting host route: {ip}");
-        let _ = self.run_cmd("ip", &["route", "del", ip]);
+        if ip.contains(':') {
+            let _ = self.run_cmd("ip", &["-6", "route", "del", ip]);
+        } else {
+            let _ = self.run_cmd("ip", &["-4", "route", "del", ip]);
+        }
         Ok(())
     }
 
@@ -62,6 +76,14 @@ impl RoutingManager {
         let parts: Vec<&str> = output.split_whitespace().collect();
         let dev_idx = parts.iter().position(|&p| p == "dev")
             .ok_or_else(|| WgsplitError::Routing("No default interface found".into()))?;
+        Ok(parts.get(dev_idx + 1).unwrap_or(&"").to_string())
+    }
+
+    fn get_default_interface_v6(&self) -> Result<String> {
+        let output = self.run_cmd_capture("ip", &["-6", "route", "show", "default"])?;
+        let parts: Vec<&str> = output.split_whitespace().collect();
+        let dev_idx = parts.iter().position(|&p| p == "dev")
+            .ok_or_else(|| WgsplitError::Routing("No IPv6 default interface found".into()))?;
         Ok(parts.get(dev_idx + 1).unwrap_or(&"").to_string())
     }
 

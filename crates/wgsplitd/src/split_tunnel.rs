@@ -11,7 +11,7 @@ use crate::host_routes::HostRoutesManager;
 use crate::routing::RoutingManager;
 use crate::nftables_mgr::NftablesManager;
 
-struct DnsLoopHandle {
+struct LoopHandle {
     cancel_flag: Arc<AtomicBool>,
 }
 
@@ -21,7 +21,8 @@ pub struct SplitTunnelManager {
     host_routes: Arc<RwLock<HostRoutesManager>>,
     nftables: Arc<std::sync::Mutex<NftablesManager>>,
     settings: Arc<RwLock<SplitTunnelingSettings>>,
-    dns_loop_handle: Arc<std::sync::Mutex<Option<DnsLoopHandle>>>,
+    dns_loop_handle: Arc<std::sync::Mutex<Option<LoopHandle>>>,
+    process_monitor_handle: Arc<std::sync::Mutex<Option<LoopHandle>>>,
 }
 
 impl SplitTunnelManager {
@@ -39,12 +40,17 @@ impl SplitTunnelManager {
             nftables: Arc::new(std::sync::Mutex::new(nftables)),
             settings: Arc::new(RwLock::new(SplitTunnelingSettings::default())),
             dns_loop_handle: Arc::new(std::sync::Mutex::new(None)),
+            process_monitor_handle: Arc::new(std::sync::Mutex::new(None)),
         })
     }
 
     pub fn apply_settings(&self, settings: &SplitTunnelingSettings) -> Result<()> {
         if !settings.enabled {
             self.disable()?;
+            {
+                let mut s = self.settings.blocking_write();
+                *s = settings.clone();
+            }
             return Ok(());
         }
 
@@ -78,10 +84,21 @@ impl SplitTunnelManager {
             }
         }
 
-        start_process_monitor_loop(
-            self.process_monitor.clone(),
-            self.cgroup.clone(),
-        );
+        {
+            let mut handle = self.process_monitor_handle.lock().unwrap();
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
+            }
+            let cancel_flag = Arc::new(AtomicBool::new(false));
+            *handle = Some(LoopHandle {
+                cancel_flag: cancel_flag.clone(),
+            });
+            start_process_monitor_loop(
+                self.process_monitor.clone(),
+                self.cgroup.clone(),
+                cancel_flag,
+            );
+        }
 
         {
             let hr = self.host_routes.blocking_read();
@@ -108,15 +125,59 @@ impl SplitTunnelManager {
     }
 
     pub fn on_tunnel_connected(&self, iface: &str) -> Result<()> {
-        let mut host_routes = self.host_routes.blocking_write();
-        host_routes.set_vpn_interface(iface);
+        {
+            let mut host_routes = self.host_routes.blocking_write();
+            host_routes.set_vpn_interface(iface);
+        }
+
+        let settings = self.settings.blocking_read().clone();
+        if settings.enabled {
+            if let Err(e) = self.apply_settings(&settings) {
+                log::warn!("Failed to re-apply split tunneling on connect: {e}");
+            }
+        } else {
+            let nft = self.nftables.lock().unwrap();
+            if let Err(e) = nft.setup_full_vpn(iface) {
+                log::warn!("Failed to setup full-VPN nftables after tunnel connect: {e}");
+            }
+        }
         Ok(())
     }
 
     pub fn on_tunnel_disconnected(&self) -> Result<()> {
-        let mut host_routes = self.host_routes.blocking_write();
-        host_routes.clear_vpn_interface();
-        host_routes.clear_all_routes()?;
+        {
+            let mut handle = self.process_monitor_handle.lock().unwrap();
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
+            }
+            *handle = None;
+        }
+
+        {
+            let mut handle = self.dns_loop_handle.lock().unwrap();
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
+            }
+            *handle = None;
+        }
+
+        {
+            let nft = self.nftables.lock().unwrap();
+            nft.teardown()?;
+        }
+
+        {
+            let mut cgroup = self.cgroup.lock().unwrap();
+            cgroup.disable()?;
+        }
+
+        {
+            let mut host_routes = self.host_routes.blocking_write();
+            host_routes.clear_vpn_interface();
+            host_routes.clear_all_routes()?;
+        }
+
+        info!("Split tunneling stopped (tunnel disconnected)");
         Ok(())
     }
 
@@ -125,6 +186,22 @@ impl SplitTunnelManager {
     }
 
     pub fn disable(&self) -> Result<()> {
+        {
+            let mut handle = self.process_monitor_handle.lock().unwrap();
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
+            }
+            *handle = None;
+        }
+
+        {
+            let mut handle = self.dns_loop_handle.lock().unwrap();
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
+            }
+            *handle = None;
+        }
+
         {
             let mut cgroup = self.cgroup.lock().unwrap();
             cgroup.disable()?;
@@ -135,9 +212,21 @@ impl SplitTunnelManager {
             host_routes.clear_all_routes()?;
         }
 
+        let vpn_iface = self.host_routes.blocking_read().vpn_interface().cloned();
         {
             let nft = self.nftables.lock().unwrap();
-            nft.teardown()?;
+            if let Some(ref iface) = vpn_iface {
+                if let Err(e) = nft.setup_full_vpn(iface) {
+                    log::warn!("Failed to setup full-VPN nftables after disabling split tunneling: {e}");
+                }
+            } else {
+                nft.teardown()?;
+            }
+        }
+
+        {
+            let mut s = self.settings.blocking_write();
+            s.enabled = false;
         }
 
         info!("Split tunneling disabled");
@@ -145,17 +234,13 @@ impl SplitTunnelManager {
     }
 
     fn start_dns_loop(&self, settings: &SplitTunnelingSettings) -> Result<()> {
-        {
-            let handle = self.dns_loop_handle.lock().unwrap();
-            if let Some(ref h) = *handle {
-                h.cancel_flag.store(true, Ordering::SeqCst);
-            }
-        }
-
         let cancel_flag = Arc::new(AtomicBool::new(false));
         {
             let mut handle = self.dns_loop_handle.lock().unwrap();
-            *handle = Some(DnsLoopHandle {
+            if let Some(ref h) = *handle {
+                h.cancel_flag.store(true, Ordering::SeqCst);
+            }
+            *handle = Some(LoopHandle {
                 cancel_flag: cancel_flag.clone(),
             });
         }

@@ -6,11 +6,59 @@ const CGROUP_NAME: &str = "wgsplit-vpn";
 
 pub struct NftablesManager {
     fwmark: u32,
+    wg_fwmark: u32,
 }
 
 impl NftablesManager {
     pub fn new(fwmark: u32) -> Self {
-        Self { fwmark }
+        Self { fwmark, wg_fwmark: fwmark + 1 }
+    }
+
+    pub fn wg_fwmark(&self) -> u32 {
+        self.wg_fwmark
+    }
+
+    pub fn setup_full_vpn(&self, vpn_iface: &str) -> Result<()> {
+        let fwmark_hex = format!("0x{:x}", self.fwmark);
+        let wg_fwmark_hex = format!("0x{:x}", self.wg_fwmark);
+        let table_name = "wgsplit";
+
+        self.teardown()?;
+
+        let ruleset = format!(
+            r#"
+table inet {table_name} {{
+    chain mangle {{
+        type route hook output priority mangle; policy accept;
+        meta mark != {wg_fwmark_hex} counter meta mark set {fwmark_hex}
+    }}
+
+    chain postrouting {{
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname "{vpn_iface}" tcp flags syn tcp option maxseg size set 1200
+        oifname "{vpn_iface}" masquerade
+    }}
+}}
+"#
+        );
+
+        debug!("Applying nftables full-VPN ruleset:\n{ruleset}");
+        let mut child = Command::new("nft")
+            .arg("-f")
+            .arg("-")
+            .stdin(std::process::Stdio::piped())
+            .spawn()?;
+        use std::io::Write;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(ruleset.as_bytes())?;
+        }
+        let status = child.wait()?;
+        if !status.success() {
+            return Err(WgsplitError::Nftables("Failed to apply full-VPN nftables ruleset".into()));
+        }
+
+        info!("nftables full-VPN rules applied (table={table_name}, fwmark={fwmark_hex})");
+        Ok(())
     }
 
     pub fn setup_base(&self, vpn_iface: &str) -> Result<()> {
@@ -29,6 +77,7 @@ table inet {table_name} {{
 
     chain postrouting {{
         type nat hook postrouting priority srcnat; policy accept;
+        oifname "{vpn_iface}" tcp flags syn tcp option maxseg size set 1200
         meta mark {fwmark_hex} oifname "{vpn_iface}" masquerade
     }}
 }}
@@ -42,7 +91,7 @@ table inet {table_name} {{
             .stdin(std::process::Stdio::piped())
             .spawn()?;
         use std::io::Write;
-        if let Some(ref mut stdin) = child.stdin {
+        if let Some(mut stdin) = child.stdin.take() {
             stdin.write_all(ruleset.as_bytes())?;
         }
         let status = child.wait()?;
@@ -102,7 +151,7 @@ table inet wgsplit {{
             .stdin(std::process::Stdio::piped())
             .spawn()?;
         use std::io::Write;
-        if let Some(ref mut stdin) = child.stdin {
+        if let Some(mut stdin) = child.stdin.take() {
             stdin.write_all(ruleset.as_bytes())?;
         }
         let status = child.wait()?;
@@ -113,7 +162,7 @@ table inet wgsplit {{
         Ok(())
     }
 
-    pub fn teardown(&self) -> Result<()> {
+pub fn teardown(&self) -> Result<()> {
         let _ = Command::new("nft")
             .args(["delete", "table", "inet", "wgsplit"])
             .stdout(std::process::Stdio::null())

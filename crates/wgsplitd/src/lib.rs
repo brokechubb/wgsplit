@@ -5,6 +5,7 @@ mod nftables_mgr;
 mod process_monitor;
 mod cgroup;
 mod dns_resolver;
+mod dns_mgr;
 mod host_routes;
 mod split_tunnel;
 mod ipc;
@@ -19,6 +20,7 @@ pub use tunnel_store::TunnelStore;
 pub use wireguard::WireGuardManager;
 pub use split_tunnel::SplitTunnelManager;
 pub use ipc::IpcServer;
+pub use dns_mgr::DnsManager;
 
 pub struct AppState {
     pub config: std::sync::RwLock<DaemonConfig>,
@@ -26,6 +28,7 @@ pub struct AppState {
     pub wg_manager: WireGuardManager,
     pub split_tunnel: SplitTunnelManager,
     pub active_tunnel: RwLock<Option<String>>,
+    pub dns_manager: std::sync::Mutex<DnsManager>,
 }
 
 impl AppState {
@@ -35,7 +38,7 @@ impl AppState {
         let routing_table = config.routing_table;
         let fwmark = config.fwmark;
         let tunnel_store = TunnelStore::new(&tunnel_dir)?;
-        let wg_manager = WireGuardManager::new(routing_table, fwmark);
+        let wg_manager = WireGuardManager::new(routing_table, fwmark, fwmark + 1);
         let split_tunnel = SplitTunnelManager::new(
             fwmark,
             routing_table,
@@ -46,6 +49,7 @@ impl AppState {
             wg_manager,
             split_tunnel,
             active_tunnel: RwLock::new(None),
+            dns_manager: std::sync::Mutex::new(DnsManager::new()),
         })
     }
 

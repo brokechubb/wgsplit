@@ -7,11 +7,12 @@ use wgsplit_common::types::{TunnelConfig, TunnelStats};
 pub struct WireGuardManager {
     routing_table: u32,
     fwmark: u32,
+    wg_fwmark: u32,
 }
 
 impl WireGuardManager {
-    pub fn new(routing_table: u32, fwmark: u32) -> Self {
-        Self { routing_table, fwmark }
+    pub fn new(routing_table: u32, fwmark: u32, wg_fwmark: u32) -> Self {
+        Self { routing_table, fwmark, wg_fwmark }
     }
 
     pub fn connect(&self, config: &TunnelConfig, tunnel_dir: &str) -> Result<String> {
@@ -35,19 +36,20 @@ impl WireGuardManager {
             "link", "add", iface, "type", "wireguard",
         ])?;
 
+        let wg_fwmark_hex = format!("0x{:x}", self.wg_fwmark);
         self.run_cmd("wg", &[
             "set", iface,
             "private-key", &self.write_keyfile(&config.interface.private_key, tunnel_dir, &config.name, "private")?,
             "listen-port", "0",
+            "fwmark", &wg_fwmark_hex,
         ])?;
 
         for addr in &config.interface.address {
             self.run_cmd("ip", &["address", "add", addr, "dev", iface])?;
         }
 
-        if let Some(mtu) = config.interface.mtu {
-            self.run_cmd("ip", &["link", "set", iface, "mtu", &mtu.to_string()])?;
-        }
+        let mtu = config.interface.mtu.unwrap_or(1280);
+        self.run_cmd("ip", &["link", "set", iface, "mtu", &mtu.to_string()])?;
 
         self.run_cmd("ip", &["link", "set", iface, "up"])?;
 
@@ -171,9 +173,22 @@ impl WireGuardManager {
     fn setup_routing(&self, iface: &str, config: &TunnelConfig) -> Result<()> {
         let table = self.routing_table.to_string();
         let fwmark_hex = format!("0x{:x}", self.fwmark);
+        let wg_fwmark_hex = format!("0x{:x}", self.wg_fwmark);
 
         self.run_cmd("ip", &[
             "-4", "route", "add", "0.0.0.0/0", "dev", iface, "table", &table,
+        ])?;
+
+        self.run_cmd("ip", &[
+            "-6", "route", "add", "::/0", "dev", iface, "table", &table,
+        ])?;
+
+        self.run_cmd("ip", &[
+            "-4", "rule", "add", "fwmark", &wg_fwmark_hex, "table", "main",
+        ])?;
+
+        self.run_cmd("ip", &[
+            "-6", "rule", "add", "fwmark", &wg_fwmark_hex, "table", "main",
         ])?;
 
         self.run_cmd("ip", &[
@@ -181,7 +196,15 @@ impl WireGuardManager {
         ])?;
 
         self.run_cmd("ip", &[
+            "-6", "rule", "add", "fwmark", &fwmark_hex, "table", &table,
+        ])?;
+
+        self.run_cmd("ip", &[
             "-4", "rule", "add", "table", "main", "suppress_prefixlength", "0",
+        ])?;
+
+        self.run_cmd("ip", &[
+            "-6", "rule", "add", "table", "main", "suppress_prefixlength", "0",
         ])?;
 
         for peer in &config.peers {
@@ -200,15 +223,31 @@ impl WireGuardManager {
     fn cleanup_routing(&self, iface: &str) -> Result<()> {
         let table = self.routing_table.to_string();
         let fwmark_hex = format!("0x{:x}", self.fwmark);
+        let wg_fwmark_hex = format!("0x{:x}", self.wg_fwmark);
 
         let _ = self.run_cmd("ip", &[
             "-4", "route", "del", "0.0.0.0/0", "dev", iface, "table", &table,
         ]);
         let _ = self.run_cmd("ip", &[
+            "-6", "route", "del", "::/0", "dev", iface, "table", &table,
+        ]);
+        let _ = self.run_cmd("ip", &[
+            "-4", "rule", "del", "fwmark", &wg_fwmark_hex, "table", "main",
+        ]);
+        let _ = self.run_cmd("ip", &[
+            "-6", "rule", "del", "fwmark", &wg_fwmark_hex, "table", "main",
+        ]);
+        let _ = self.run_cmd("ip", &[
             "-4", "rule", "del", "fwmark", &fwmark_hex, "table", &table,
         ]);
         let _ = self.run_cmd("ip", &[
+            "-6", "rule", "del", "fwmark", &fwmark_hex, "table", &table,
+        ]);
+        let _ = self.run_cmd("ip", &[
             "-4", "rule", "del", "table", "main", "suppress_prefixlength", "0",
+        ]);
+        let _ = self.run_cmd("ip", &[
+            "-6", "rule", "del", "table", "main", "suppress_prefixlength", "0",
         ]);
 
         Ok(())
